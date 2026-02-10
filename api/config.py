@@ -1,0 +1,63 @@
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    # PostgreSQL Utilisateur
+    postgres_utilisateur_host: str = "localhost"
+    postgres_utilisateur_port: int = 5432
+    postgres_utilisateur_user: str = "utilisateur_user"
+    postgres_utilisateur_password: str = ""
+    postgres_utilisateur_db: str = "utilisateur_db"
+
+    # PostgreSQL Santé
+    postgres_sante_host: str = "localhost"
+    postgres_sante_port: int = 5433
+    postgres_sante_user: str = "sante_user"
+    postgres_sante_password: str = ""
+    postgres_sante_db: str = "sante_db"
+
+    # MongoDB Logs
+    mongodb_logs_host: str = "localhost"
+    mongodb_logs_port: int = 27017
+    mongodb_logs_db: str = "logs_config"
+
+    # MongoDB Reco
+    mongodb_reco_host: str = "localhost"
+    mongodb_reco_port: int = 27018
+    mongodb_reco_db: str = "reco"
+
+    # JWT
+    jwt_secret: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60
+
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",
+    }
+
+    @property
+    def postgres_utilisateur_url(self) -> str:
+        return (
+            f"postgresql://{self.postgres_utilisateur_user}:{self.postgres_utilisateur_password}"
+            f"@{self.postgres_utilisateur_host}:{self.postgres_utilisateur_port}/{self.postgres_utilisateur_db}"
+        )
+
+    @property
+    def postgres_sante_url(self) -> str:
+        return (
+            f"postgresql://{self.postgres_sante_user}:{self.postgres_sante_password}"
+            f"@{self.postgres_sante_host}:{self.postgres_sante_port}/{self.postgres_sante_db}"
+        )
+
+    @property
+    def mongodb_logs_url(self) -> str:
+        return f"mongodb://{self.mongodb_logs_host}:{self.mongodb_logs_port}"
+
+    @property
+    def mongodb_reco_url(self) -> str:
+        return f"mongodb://{self.mongodb_reco_host}:{self.mongodb_reco_port}"
+
+
+settings = Settings()

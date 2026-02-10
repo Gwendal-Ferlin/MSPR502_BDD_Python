@@ -1,0 +1,139 @@
+services:
+  postgres-utilisateur:
+    image: postgres:16-alpine
+    container_name: postgres-utilisateur
+    environment:
+      POSTGRES_USER: ${POSTGRES_UTILISATEUR_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_UTILISATEUR_PASSWORD}
+      POSTGRES_DB: utilisateur_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_utilisateur_data:/var/lib/postgresql/data
+      - ./init/postgres-utilisateur:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mspr502-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d utilisateur_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-sante:
+    image: postgres:16-alpine
+    container_name: postgres-sante
+    environment:
+      POSTGRES_USER: ${POSTGRES_SANTE_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_SANTE_PASSWORD}
+      POSTGRES_DB: sante_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_sante_data:/var/lib/postgresql/data
+      - ./init/postgres-sante:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mspr502-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d sante_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mongodb-logs:
+    image: mongo:7
+    container_name: mongodb-logs
+    environment:
+      MONGO_INITDB_DATABASE: logs_config
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_logs_data:/data/db
+    networks:
+      - mspr502-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mongodb-reco:
+    image: mongo:7
+    container_name: mongodb-reco
+    environment:
+      MONGO_INITDB_DATABASE: reco
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_reco_data:/data/db
+    networks:
+      - mspr502-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  init-mongodb-logs:
+    image: mongo:7
+    depends_on:
+      mongodb-logs:
+        condition: service_healthy
+    volumes:
+      - ./init/mongodb-logs:/scripts:ro
+    entrypoint: ["mongosh", "mongodb://mongodb-logs:27017/logs_config", "--file", "/scripts/init.js"]
+    networks:
+      - mspr502-network
+    restart: "no"
+
+  init-mongodb-reco:
+    image: mongo:7
+    depends_on:
+      mongodb-reco:
+        condition: service_healthy
+    volumes:
+      - ./init/mongodb-reco:/scripts:ro
+    entrypoint: ["mongosh", "mongodb://mongodb-reco:27017/reco", "--file", "/scripts/init.js"]
+    networks:
+      - mspr502-network
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Surcharges pour le réseau Docker (le .env fournit user/password et le reste)
+      POSTGRES_UTILISATEUR_HOST: postgres-utilisateur
+      POSTGRES_UTILISATEUR_PORT: 5432
+      POSTGRES_SANTE_HOST: postgres-sante
+      POSTGRES_SANTE_PORT: 5432
+      MONGODB_LOGS_HOST: mongodb-logs
+      MONGODB_LOGS_PORT: 27017
+      MONGODB_RECO_HOST: mongodb-reco
+      MONGODB_RECO_PORT: 27017
+    depends_on:
+      postgres-utilisateur:
+        condition: service_healthy
+      postgres-sante:
+        condition: service_healthy
+      mongodb-logs:
+        condition: service_healthy
+      mongodb-reco:
+        condition: service_healthy
+    networks:
+      - mspr502-network
+
+networks:
+  mspr502-network:
+    driver: bridge
+
+volumes:
+  pg_utilisateur_data:
+  pg_sante_data:
+  mongo_logs_data:
+  mongo_reco_data:
