@@ -1,0 +1,117 @@
+erDiagram
+    %% ==========================================
+    %% ZONE IDENTITÉ (BASE A - PII)
+    %% ==========================================
+    COMPTE_UTILISATEUR ||--|| VAULT_CORRESPONDANCE : "identifie"
+    
+    COMPTE_UTILISATEUR {
+        int id_user PK
+        string email
+        string password
+        string role "Admin, Super-Admin, Client"
+        string type_abonnement "Freemium, Premium, Premium+"
+        datetime date_consentement_rgpd
+    }
+
+    %% ==========================================
+    %% ZONE PIVOT (Le lien anonymisé - RGPD)
+    %% ==========================================
+    VAULT_CORRESPONDANCE {
+        uuid id_anonyme PK
+        int id_user FK
+        datetime date_derniere_activite
+        boolean consentement_sante_actif
+    }
+
+    %% ==========================================
+    %% ZONE SANTÉ & SUIVI (BASE B - Pseudonymisée)
+    %% ==========================================
+    VAULT_CORRESPONDANCE ||--|| PROFIL_SANTÉ : "définit"
+    VAULT_CORRESPONDANCE ||--o{ OBJECTIF_UTILISATEUR : "poursuit"
+    VAULT_CORRESPONDANCE ||--o{ SUIVI_BIOMETRIQUE : "mesure"
+    VAULT_CORRESPONDANCE ||--o{ JOURNAL_ALIMENTAIRE : "enregistre"
+    VAULT_CORRESPONDANCE ||--o{ SEANCE_ACTIVITE : "pratique"
+    VAULT_CORRESPONDANCE }o--o{ REF_RESTRICTION : "est sujet à"
+    VAULT_CORRESPONDANCE }o--o{ MATERIEL : "possède"
+
+    PROFIL_SANTÉ {
+        int id_profil PK
+        int annee_naissance
+        string sexe
+        int taille_cm
+    }
+
+    OBJECTIF_UTILISATEUR {
+        int id_objectif_u PK
+        string type_objectif
+        float valeur_cible
+        datetime date_debut
+        string statut
+    }
+
+    SUIVI_BIOMETRIQUE {
+        int id_biometrie PK
+        datetime date_releve
+        float poids_kg
+        int score_sommeil
+    }
+
+    %% --- MODULE NUTRITION ---
+    JOURNAL_ALIMENTAIRE {
+        int id_repas PK
+        datetime horodatage
+        string nom_repas
+        string type_repas "Petit-dej, Collation, etc."
+        float total_calories
+        float total_proteines
+        float total_glucides
+        float total_lipides
+    }
+
+    %% --- MODULE SPORT ---
+    SEANCE_ACTIVITE {
+        int id_seance PK
+        datetime horodatage
+        string nom_seance
+        int ressenti_effort_RPE
+    }
+    
+    SEANCE_ACTIVITE ||--|{ DETAIL_PERFORMANCE : "détaille"
+    REF_EXERCICE ||--o{ DETAIL_PERFORMANCE : "exécuté"
+
+    DETAIL_PERFORMANCE {
+        int series
+        int reps
+        float charge_kg
+    }
+
+    %% ==========================================
+    %% RÉFÉRENTIELS ET LOGS
+    %% ==========================================
+    MATERIEL {
+        int id_materiel PK
+        string nom
+    }
+
+    REF_RESTRICTION {
+        int id_restriction PK
+        string nom
+        string type
+    }
+
+    REF_EXERCICE {
+        int id_exercice PK
+        string nom
+        string muscle_principal
+    }
+
+    %% Liens logiques IA
+    REF_EXERCICE }o--o{ MATERIEL : "nécessite"
+
+    LOGS_EVENEMENTS {
+        string id_log PK
+        datetime timestamp
+        uuid id_anonyme
+        string action
+        json details_techniques
+    }
