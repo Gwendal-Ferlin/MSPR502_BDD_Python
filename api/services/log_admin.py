@@ -1,5 +1,6 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import uuid
 from pymongo.database import Database
@@ -39,7 +40,7 @@ def log_admin_consultation_tiers(
     coll = db_logs["evenements"]
     coll.insert_one({
         "id_log": f"log-{uuid.uuid4().hex[:12]}",
-        "timestamp": datetime.now(timezone.utc),
+        "timestamp": datetime.now(ZoneInfo("Europe/Paris")),
         "id_anonyme": current_user.id_anonyme,
         "action": "consultation_donnees_tiers",
         "details_techniques": details,
