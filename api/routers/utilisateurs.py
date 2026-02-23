@@ -1,3 +1,4 @@
+import bcrypt
 from uuid import UUID
 from typing import Annotated
 
@@ -10,12 +11,55 @@ from api.auth.dependencies import get_current_user, require_roles
 from api.db.postgres_utilisateur import get_session_utilisateur
 from api.db.mongo_logs import get_mongo_logs
 from api.schemas.auth import CurrentUser
-from api.schemas.utilisateurs import CompteUtilisateurRead, VaultRead
+from api.schemas.utilisateurs import CompteUtilisateurRead, VaultRead, CompteUtilisateurCreate
 from api.services.log_admin import log_admin_consultation_tiers
 
 router = APIRouter(prefix="/utilisateurs", tags=["Utilisateurs"])
 
 AdminOrSuperAdmin = Annotated[CurrentUser, Depends(require_roles(["Admin", "Super-Admin"]))]
+
+
+@router.post("", response_model=CompteUtilisateurRead, status_code=status.HTTP_201_CREATED)
+def create_compte(
+    body: CompteUtilisateurCreate,
+    db: Session = Depends(get_session_utilisateur),
+):
+    email = body.email.strip().lower()
+    # 1. Vérifier si l'email existe déjà
+    existing = db.execute(
+        text("SELECT id_user FROM compte_utilisateur WHERE email = :email"),
+        {"email": email}
+    ).fetchone()
+    if existing:
+        raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
+
+    # 2. Hasher le mot de passe
+    hashed_pw = bcrypt.hashpw(body.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+    # 3. Créer le compte (Role: Client, Abonnement: Freemium)
+    new_user_row = db.execute(
+        text("""
+            INSERT INTO compte_utilisateur (email, password, role, type_abonnement, date_consentement_rgpd)
+            VALUES (:email, :password, 'Client', 'Freemium', :rgpd)
+            RETURNING id_user, email, role, type_abonnement, date_consentement_rgpd
+        """),
+        {
+            "email": email,
+            "password": hashed_pw,
+            "rgpd": body.date_consentement_rgpd
+        }
+    ).fetchone()
+
+    new_user = dict(new_user_row._mapping)
+
+    # 4. Créer l'entrée dans le vault pour le lien anonymisé
+    db.execute(
+        text("INSERT INTO vault_correspondance (id_user) VALUES (:id_user)"),
+        {"id_user": new_user["id_user"]}
+    )
+    db.commit()
+
+    return CompteUtilisateurRead.model_validate(new_user)
 
 
 @router.get("", response_model=list[CompteUtilisateurRead])
