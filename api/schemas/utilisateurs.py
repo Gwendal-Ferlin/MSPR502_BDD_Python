@@ -13,6 +13,12 @@ class CompteUtilisateurRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CompteUtilisateurCreate(BaseModel):
+    email: str
+    password: str
+    date_consentement_rgpd: datetime | None = None
+
+
 class VaultRead(BaseModel):
     id_anonyme: UUID
     id_user: int
