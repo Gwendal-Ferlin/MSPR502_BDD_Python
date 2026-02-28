@@ -9,6 +9,7 @@ class CompteUtilisateurRead(BaseModel):
     role: str
     type_abonnement: str
     date_consentement_rgpd: datetime | None
+    est_supprime: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -17,6 +18,12 @@ class CompteUtilisateurCreate(BaseModel):
     email: str
     password: str
     date_consentement_rgpd: datetime | None = None
+
+
+class CompteUtilisateurUpdate(BaseModel):
+    """Champs modifiables par l'utilisateur sur son propre compte (email, mot de passe)."""
+    email: str | None = None
+    password: str | None = None
 
 
 class VaultRead(BaseModel):

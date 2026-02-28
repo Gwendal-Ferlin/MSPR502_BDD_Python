@@ -44,3 +44,32 @@ def log_admin_consultation_tiers(
         "action": "consultation_donnees_tiers",
         "details_techniques": details,
     })
+
+
+def log_admin_suppression_utilisateur_tiers(
+    db_logs: Database,
+    current_user: CurrentUser,
+    endpoint: str,
+    id_user_cible: int,
+) -> None:
+    """Enregistre quand un Admin/Super-Admin supprime le compte d'un tiers."""
+    if current_user.role not in ("Admin", "Super-Admin"):
+        return
+    if id_user_cible == current_user.id_user:
+        return
+
+    details = {
+        "endpoint": endpoint,
+        "role_acteur": current_user.role,
+        "id_user_acteur": current_user.id_user,
+        "id_user_cible": id_user_cible,
+    }
+
+    coll = db_logs["evenements"]
+    coll.insert_one({
+        "id_log": f"log-{uuid.uuid4().hex[:12]}",
+        "timestamp": datetime.now(timezone.utc),
+        "id_anonyme": current_user.id_anonyme,
+        "action": "suppression_utilisateur_tiers",
+        "details_techniques": details,
+    })

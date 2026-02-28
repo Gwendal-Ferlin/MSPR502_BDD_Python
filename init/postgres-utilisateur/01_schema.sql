@@ -9,7 +9,8 @@ CREATE TABLE compte_utilisateur (
     password VARCHAR(255) NOT NULL,
     role VARCHAR(50) NOT NULL CHECK (role IN ('Admin', 'Super-Admin', 'Client')),
     type_abonnement VARCHAR(50) NOT NULL CHECK (type_abonnement IN ('Freemium', 'Premium', 'Premium+')),
-    date_consentement_rgpd TIMESTAMPTZ
+    date_consentement_rgpd TIMESTAMPTZ,
+    est_supprime BOOLEAN NOT NULL DEFAULT false
 );
 
 -- ==========================================

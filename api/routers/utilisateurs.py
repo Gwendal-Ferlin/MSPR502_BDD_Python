@@ -11,8 +11,8 @@ from api.auth.dependencies import get_current_user, require_roles
 from api.db.postgres_utilisateur import get_session_utilisateur
 from api.db.mongo_logs import get_mongo_logs
 from api.schemas.auth import CurrentUser
-from api.schemas.utilisateurs import CompteUtilisateurRead, VaultRead, CompteUtilisateurCreate
-from api.services.log_admin import log_admin_consultation_tiers
+from api.schemas.utilisateurs import CompteUtilisateurRead, VaultRead, CompteUtilisateurCreate, CompteUtilisateurUpdate
+from api.services.log_admin import log_admin_consultation_tiers, log_admin_suppression_utilisateur_tiers
 
 router = APIRouter(prefix="/utilisateurs", tags=["Utilisateurs"])
 
@@ -41,7 +41,7 @@ def create_compte(
         text("""
             INSERT INTO compte_utilisateur (email, password, role, type_abonnement, date_consentement_rgpd)
             VALUES (:email, :password, 'Client', 'Freemium', :rgpd)
-            RETURNING id_user, email, role, type_abonnement, date_consentement_rgpd
+            RETURNING id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime
         """),
         {
             "email": email,
@@ -71,8 +71,103 @@ def list_comptes(
     log_admin_consultation_tiers(
         db_logs, current_user, "GET /api/utilisateurs", details_extra={"liste_complete": True}
     )
-    rows = db.execute(text("SELECT id_user, email, role, type_abonnement, date_consentement_rgpd FROM compte_utilisateur")).fetchall()
+    rows = db.execute(text("SELECT id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime FROM compte_utilisateur WHERE COALESCE(est_supprime, false) = false")).fetchall()
     return [CompteUtilisateurRead.model_validate(dict(r._mapping)) for r in rows]
+
+
+@router.get("/me", response_model=CompteUtilisateurRead)
+def get_mon_compte(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Session = Depends(get_session_utilisateur),
+):
+    """Retourne le compte de l'utilisateur connecté."""
+    row = db.execute(
+        text("SELECT id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
+        {"id": current_user.id_user},
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé")
+    return CompteUtilisateurRead.model_validate(dict(row._mapping))
+
+
+@router.patch("/me", response_model=CompteUtilisateurRead)
+def modifier_mon_compte(
+    body: CompteUtilisateurUpdate,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Session = Depends(get_session_utilisateur),
+):
+    """Permet à l'utilisateur connecté de modifier son email et/ou son mot de passe."""
+    id_user = current_user.id_user
+    updates = []
+    params = {"id": id_user}
+
+    if body.email is not None:
+        email = body.email.strip().lower()
+        existing = db.execute(
+            text("SELECT id_user FROM compte_utilisateur WHERE email = :email AND id_user != :id"),
+            {"email": email, "id": id_user},
+        ).fetchone()
+        if existing:
+            raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
+        updates.append("email = :email")
+        params["email"] = email
+
+    if body.password is not None:
+        hashed_pw = bcrypt.hashpw(body.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        updates.append("password = :password")
+        params["password"] = hashed_pw
+
+    if not updates:
+        row = db.execute(
+            text("SELECT id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime FROM compte_utilisateur WHERE id_user = :id"),
+            {"id": id_user},
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé")
+        return CompteUtilisateurRead.model_validate(dict(row._mapping))
+
+    set_clause = ", ".join(updates)
+    db.execute(
+        text(f"UPDATE compte_utilisateur SET {set_clause} WHERE id_user = :id"),
+        params,
+    )
+    db.commit()
+    row = db.execute(
+        text("SELECT id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime FROM compte_utilisateur WHERE id_user = :id"),
+        {"id": id_user},
+    ).fetchone()
+    return CompteUtilisateurRead.model_validate(dict(row._mapping))
+
+
+@router.delete("/{id_user}", status_code=status.HTTP_204_NO_CONTENT)
+def supprimer_compte(
+    id_user: int,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Session = Depends(get_session_utilisateur),
+    db_logs: Database = Depends(get_mongo_logs),
+):
+    """Suppression logique (est_supprime=true). Le client peut se supprimer lui-même ; un Admin/Super-Admin peut supprimer tout compte. Les suppressions par un admin sur un tiers sont loguées."""
+    if current_user.role not in ("Admin", "Super-Admin") and current_user.id_user != id_user:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants")
+
+    row = db.execute(
+        text("SELECT id_user FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
+        {"id": id_user},
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé")
+
+    if current_user.role in ("Admin", "Super-Admin") and current_user.id_user != id_user:
+        log_admin_suppression_utilisateur_tiers(
+            db_logs, current_user, "DELETE /api/utilisateurs/{id_user}", id_user_cible=id_user
+        )
+
+    db.execute(
+        text("UPDATE compte_utilisateur SET est_supprime = true WHERE id_user = :id"),
+        {"id": id_user},
+    )
+    db.commit()
+    return None
 
 
 @router.get("/{id_user}", response_model=CompteUtilisateurRead)
@@ -88,7 +183,7 @@ def get_compte(
         db_logs, current_user, "GET /api/utilisateurs/{id_user}", id_user_cible=id_user
     )
     row = db.execute(
-        text("SELECT id_user, email, role, type_abonnement, date_consentement_rgpd FROM compte_utilisateur WHERE id_user = :id"),
+        text("SELECT id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
         {"id": id_user},
     ).fetchone()
     if not row:

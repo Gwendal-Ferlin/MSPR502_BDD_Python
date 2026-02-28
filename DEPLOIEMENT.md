@@ -36,3 +36,7 @@ Sur **TrueNAS Scale 24.10 (Electric Eel)** ou plus récent, l’interface suppor
 ## Alternative : VM Linux + Docker Compose
 
 Si tu préfères tout gérer dans une VM (SSH, `docker compose up`, logs, sauvegardes manuelles), installer une VM sous TrueNAS puis à l’intérieur utiliser le même `docker-compose.yml` et `.env` qu’en local. Aucune conversion Kubernetes nécessaire.
+
+
+
+docker compose build --no-cache api

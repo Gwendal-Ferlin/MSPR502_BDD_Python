@@ -20,7 +20,7 @@ def login(
 ):
     row = db.execute(
         text(
-            "SELECT id_user, email, password, role FROM compte_utilisateur WHERE email = :email"
+            "SELECT id_user, email, password, role FROM compte_utilisateur WHERE email = :email AND COALESCE(est_supprime, false) = false"
         ),
         {"email": body.email.strip().lower()},
     ).fetchone()

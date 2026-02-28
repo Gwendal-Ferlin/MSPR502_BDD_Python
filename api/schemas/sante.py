@@ -13,6 +13,12 @@ class ProfilSanteRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ProfilSanteUpdate(BaseModel):
+    annee_naissance: int | None = None
+    sexe: str | None = None
+    taille_cm: int | None = None
+
+
 class ObjectifRead(BaseModel):
     id_objectif_u: int
     id_anonyme: UUID
@@ -22,6 +28,29 @@ class ObjectifRead(BaseModel):
     statut: str | None
 
     model_config = {"from_attributes": True}
+
+
+class ObjectifUpdate(BaseModel):
+    type_objectif: str | None = None
+    valeur_cible: float | None = None
+    date_debut: datetime | None = None
+    statut: str | None = None
+
+
+class SuiviBiometriqueRead(BaseModel):
+    id_biometrie: int
+    id_anonyme: UUID
+    date_releve: datetime
+    poids_kg: float | None
+    score_sommeil: int | None
+
+    model_config = {"from_attributes": True}
+
+
+class SuiviBiometriqueUpdate(BaseModel):
+    date_releve: datetime | None = None
+    poids_kg: float | None = None
+    score_sommeil: int | None = None
 
 
 class JournalRead(BaseModel):
@@ -52,6 +81,11 @@ class RestrictionRead(BaseModel):
     id: int
     nom: str
     type: str | None = None
+
+
+class MesRestrictionsUpdate(BaseModel):
+    """Liste des id_restriction à associer à l'utilisateur (remplace les restrictions actuelles)."""
+    id_restrictions: list[int]
 
 
 class ReferentielRead(BaseModel):
