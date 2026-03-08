@@ -40,15 +40,39 @@ docker compose down
 
 ### Initialisation des bases (schémas + données de test)
 
-En local, les dossiers `init/postgres-utilisateur` et `init/postgres-sante` sont montés dans les conteneurs Postgres : au premier démarrage, les scripts `*.sql` dans ces dossiers sont exécutés (schéma + seed si présents).
+**En local** (avec `docker-compose.yml`), les dossiers `init/postgres-utilisateur` et `init/postgres-sante` sont montés dans les conteneurs Postgres : au premier démarrage, les scripts `*.sql` sont exécutés automatiquement (schéma + seed si présents).
 
-Pour des bases déjà créées (volumes existants), tu peux exécuter les scripts à la main :
+**Sur le serveur / TrueNAS** (avec `docker-compose.truenas.yml`), les bases démarrent vides. Après `docker compose -f docker-compose.truenas.yml up -d --build`, exécuter les scripts à la main (depuis la racine du projet) :
 
+**1) Postgres utilisateur (schéma + seed) :**
 ```bash
-# Exemple Postgres utilisateur
 docker cp init/postgres-utilisateur/01_schema.sql postgres-utilisateur:/tmp/
 docker exec postgres-utilisateur psql -U utilisateur_user -d utilisateur_db -f /tmp/01_schema.sql
+docker cp init/postgres-utilisateur/02_seed.sql postgres-utilisateur:/tmp/
+docker exec postgres-utilisateur psql -U utilisateur_user -d utilisateur_db -f /tmp/02_seed.sql
 ```
+
+**2) Postgres santé (schéma + seed) :**
+```bash
+docker cp init/postgres-sante/01_schema.sql postgres-sante:/tmp/
+docker exec postgres-sante psql -U sante_user -d sante_db -f /tmp/01_schema.sql
+docker cp init/postgres-sante/02_seed.sql postgres-sante:/tmp/
+docker exec postgres-sante psql -U sante_user -d sante_db -f /tmp/02_seed.sql
+```
+
+**3) MongoDB logs :**
+```bash
+docker cp init/mongodb-logs/init.js mongodb-logs:/tmp/
+docker exec mongodb-logs mongosh logs_config --file /tmp/init.js
+```
+
+**4) MongoDB reco :**
+```bash
+docker cp init/mongodb-reco/init.js mongodb-reco:/tmp/
+docker exec mongodb-reco mongosh reco --file /tmp/init.js
+```
+
+Pour des bases déjà créées en local (volumes existants) sans init auto, les mêmes commandes Postgres/Mongo ci-dessus s’appliquent.
 
 ---
 
