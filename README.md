@@ -72,6 +72,13 @@ docker cp init/mongodb-reco/init.js mongodb-reco:/tmp/
 docker exec mongodb-reco mongosh reco --file /tmp/init.js
 ```
 
+**5) Migration abonnement (Postgres utilisateur déjà existant) :**  
+À exécuter si la base `utilisateur_db` existe déjà sans les colonnes `date_fin_periode_payee` et `desabonnement_a_fin_periode` (ajout Premium / désabonnement).
+```bash
+docker cp init/postgres-utilisateur/04_migration_abonnement.sql postgres-utilisateur:/tmp/
+docker exec postgres-utilisateur psql -U utilisateur_user -d utilisateur_db -f /tmp/04_migration_abonnement.sql
+```
+
 Pour des bases déjà créées en local (volumes existants) sans init auto, les mêmes commandes Postgres/Mongo ci-dessus s’appliquent.
 
 ---
@@ -93,6 +100,8 @@ erDiagram
         string type_abonnement
         datetime date_consentement_rgpd
         boolean est_supprime
+        datetime date_fin_periode_payee
+        boolean desabonnement_a_fin_periode
     }
     VAULT_CORRESPONDANCE {
         uuid id_anonyme PK
