@@ -1,4 +1,5 @@
 import bcrypt
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from typing import Annotated
 
@@ -11,12 +12,51 @@ from api.auth.dependencies import get_current_user, require_roles
 from api.db.postgres_utilisateur import get_session_utilisateur
 from api.db.mongo_logs import get_mongo_logs
 from api.schemas.auth import CurrentUser
-from api.schemas.utilisateurs import CompteUtilisateurRead, VaultRead, CompteUtilisateurCreate, CompteUtilisateurUpdate
+from api.schemas.utilisateurs import (
+    CompteUtilisateurRead,
+    VaultRead,
+    CompteUtilisateurCreate,
+    CompteUtilisateurUpdate,
+    SouscrireAbonnement,
+)
 from api.services.log_admin import log_admin_consultation_tiers, log_admin_suppression_utilisateur_tiers
 
 router = APIRouter(prefix="/utilisateurs", tags=["Utilisateurs"])
 
 AdminOrSuperAdmin = Annotated[CurrentUser, Depends(require_roles(["Admin", "Super-Admin"]))]
+
+SELECT_COMPTE_COLS = (
+    "id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime, "
+    "date_fin_periode_payee, desabonnement_a_fin_periode"
+)
+ABONNEMENT_DUREE_MOIS = 1
+
+
+def _appliquer_fin_periode_si_necessaire(db: Session, id_user: int) -> None:
+    """Si désabonnement à fin de période et date dépassée, repasse le compte en Freemium."""
+    db.execute(
+        text("""
+            UPDATE compte_utilisateur
+            SET type_abonnement = 'Freemium', date_fin_periode_payee = NULL, desabonnement_a_fin_periode = false
+            WHERE id_user = :id AND desabonnement_a_fin_periode = true
+              AND date_fin_periode_payee IS NOT NULL AND date_fin_periode_payee < now()
+        """),
+        {"id": id_user},
+    )
+    db.commit()
+
+
+def _appliquer_fin_periode_tous(db: Session) -> None:
+    """Applique la rétrogradation Freemium à tous les comptes échus (pour list_comptes)."""
+    db.execute(
+        text("""
+            UPDATE compte_utilisateur
+            SET type_abonnement = 'Freemium', date_fin_periode_payee = NULL, desabonnement_a_fin_periode = false
+            WHERE desabonnement_a_fin_periode = true
+              AND date_fin_periode_payee IS NOT NULL AND date_fin_periode_payee < now()
+        """)
+    )
+    db.commit()
 
 
 @router.post("", response_model=CompteUtilisateurRead, status_code=status.HTTP_201_CREATED)
@@ -38,10 +78,10 @@ def create_compte(
 
     # 3. Créer le compte (Role: Client, Abonnement: Freemium)
     new_user_row = db.execute(
-        text("""
+        text(f"""
             INSERT INTO compte_utilisateur (email, password, role, type_abonnement, date_consentement_rgpd)
             VALUES (:email, :password, 'Client', 'Freemium', :rgpd)
-            RETURNING id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime
+            RETURNING {SELECT_COMPTE_COLS}
         """),
         {
             "email": email,
@@ -71,7 +111,10 @@ def list_comptes(
     log_admin_consultation_tiers(
         db_logs, current_user, "GET /api/utilisateurs", details_extra={"liste_complete": True}
     )
-    rows = db.execute(text("SELECT id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime FROM compte_utilisateur WHERE COALESCE(est_supprime, false) = false")).fetchall()
+    _appliquer_fin_periode_tous(db)
+    rows = db.execute(
+        text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE COALESCE(est_supprime, false) = false")
+    ).fetchall()
     return [CompteUtilisateurRead.model_validate(dict(r._mapping)) for r in rows]
 
 
@@ -81,8 +124,9 @@ def get_mon_compte(
     db: Session = Depends(get_session_utilisateur),
 ):
     """Retourne le compte de l'utilisateur connecté."""
+    _appliquer_fin_periode_si_necessaire(db, current_user.id_user)
     row = db.execute(
-        text("SELECT id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
+        text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
         {"id": current_user.id_user},
     ).fetchone()
     if not row:
@@ -118,8 +162,9 @@ def modifier_mon_compte(
         params["password"] = hashed_pw
 
     if not updates:
+        _appliquer_fin_periode_si_necessaire(db, id_user)
         row = db.execute(
-            text("SELECT id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime FROM compte_utilisateur WHERE id_user = :id"),
+            text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"),
             {"id": id_user},
         ).fetchone()
         if not row:
@@ -132,11 +177,78 @@ def modifier_mon_compte(
         params,
     )
     db.commit()
+    _appliquer_fin_periode_si_necessaire(db, id_user)
     row = db.execute(
-        text("SELECT id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime FROM compte_utilisateur WHERE id_user = :id"),
+        text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"),
         {"id": id_user},
     ).fetchone()
     return CompteUtilisateurRead.model_validate(dict(row._mapping))
+
+
+@router.post("/me/abonnement/souscrire", response_model=CompteUtilisateurRead)
+def souscrire_abonnement(
+    body: SouscrireAbonnement,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Session = Depends(get_session_utilisateur),
+):
+    """Souscrit à Premium ou Premium+ (mock paiement : pas de vrai paiement, période fixe 1 mois)."""
+    id_user = current_user.id_user
+    row = db.execute(
+        text(f"SELECT id_user FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
+        {"id": id_user},
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé")
+    date_fin = datetime.now(timezone.utc) + timedelta(days=30 * ABONNEMENT_DUREE_MOIS)
+    db.execute(
+        text("""
+            UPDATE compte_utilisateur
+            SET type_abonnement = :type_abonnement, date_fin_periode_payee = :date_fin, desabonnement_a_fin_periode = false
+            WHERE id_user = :id
+        """),
+        {"id": id_user, "type_abonnement": body.type_abonnement, "date_fin": date_fin},
+    )
+    db.commit()
+    row = db.execute(
+        text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"),
+        {"id": id_user},
+    ).fetchone()
+    return CompteUtilisateurRead.model_validate(dict(row._mapping))
+
+
+@router.post("/me/abonnement/desabonner", response_model=CompteUtilisateurRead)
+def desabonner(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Session = Depends(get_session_utilisateur),
+):
+    """Demande à ne pas renouveler : l'abonnement reste actif jusqu'à date_fin_periode_payee."""
+    id_user = current_user.id_user
+    row = db.execute(
+        text(f"SELECT type_abonnement, desabonnement_a_fin_periode FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
+        {"id": id_user},
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé")
+    if row.type_abonnement == "Freemium":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Compte déjà en Freemium")
+    if row.desabonnement_a_fin_periode:
+        # Idempotent : déjà désabonné à fin de période
+        r = db.execute(
+            text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"),
+            {"id": id_user},
+        ).fetchone()
+        return CompteUtilisateurRead.model_validate(dict(r._mapping))
+    db.execute(
+        text("UPDATE compte_utilisateur SET desabonnement_a_fin_periode = true WHERE id_user = :id"),
+        {"id": id_user},
+    )
+    db.commit()
+    _appliquer_fin_periode_si_necessaire(db, id_user)
+    r = db.execute(
+        text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"),
+        {"id": id_user},
+    ).fetchone()
+    return CompteUtilisateurRead.model_validate(dict(r._mapping))
 
 
 @router.delete("/{id_user}", status_code=status.HTTP_204_NO_CONTENT)
@@ -182,8 +294,9 @@ def get_compte(
     log_admin_consultation_tiers(
         db_logs, current_user, "GET /api/utilisateurs/{id_user}", id_user_cible=id_user
     )
+    _appliquer_fin_periode_si_necessaire(db, id_user)
     row = db.execute(
-        text("SELECT id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
+        text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
         {"id": id_user},
     ).fetchone()
     if not row:

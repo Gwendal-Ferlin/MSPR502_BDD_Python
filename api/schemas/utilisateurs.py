@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 from pydantic import BaseModel
 
@@ -10,8 +11,15 @@ class CompteUtilisateurRead(BaseModel):
     type_abonnement: str
     date_consentement_rgpd: datetime | None
     est_supprime: bool = False
+    date_fin_periode_payee: datetime | None = None
+    desabonnement_a_fin_periode: bool = False
 
     model_config = {"from_attributes": True}
+
+
+class SouscrireAbonnement(BaseModel):
+    """Body pour souscrire à Premium ou Premium+ (mock paiement)."""
+    type_abonnement: Literal["Premium", "Premium+"]
 
 
 class CompteUtilisateurCreate(BaseModel):

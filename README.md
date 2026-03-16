@@ -221,9 +221,11 @@ Toutes les routes ci‑dessous exigent un token valide.
 
 | Méthode | Chemin | Rôle | Logué | Description |
 |--------|--------|------|-------|-------------|
-| GET | `/api/utilisateurs/me` | Tous | Non | Retourne le compte de l'utilisateur connecté. |
+| GET | `/api/utilisateurs/me` | Tous | Non | Retourne le compte de l'utilisateur connecté (inclut `date_fin_periode_payee`, `desabonnement_a_fin_periode`). |
 | PATCH | `/api/utilisateurs/me` | Tous | Non | Met à jour l'email et/ou le mot de passe du compte connecté. **Body** : `email`, `password` (optionnels). |
-| GET | `/api/utilisateurs` | Admin, Super-Admin | **Oui** | Liste tous les comptes (id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime). Pas de mot de passe. Consultation liste complète = logué. |
+| POST | `/api/utilisateurs/me/abonnement/souscrire` | Tous | Non | Souscrit à Premium ou Premium+ (paiement mocké : pas de vrai paiement, période 1 mois). **Body** : `{"type_abonnement": "Premium"}` ou `"Premium+"`. Réponse : compte avec `date_fin_periode_payee` et `desabonnement_a_fin_periode = false`. |
+| POST | `/api/utilisateurs/me/abonnement/desabonner` | Tous | Non | Demande à ne pas renouveler : l'abonnement reste actif jusqu'à `date_fin_periode_payee`. À l'échéance, le compte repasse en Freemium (à la volée, sans cron). 400 si déjà Freemium. |
+| GET | `/api/utilisateurs` | Admin, Super-Admin | **Oui** | Liste tous les comptes (id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime, date_fin_periode_payee, desabonnement_a_fin_periode). Pas de mot de passe. Consultation liste complète = logué. |
 | GET | `/api/utilisateurs/{id_user}` | Tous | **Oui** si admin consulte un autre `id_user` | Détail d'un compte par `id_user`. Un **Client** ne peut accéder qu'à son propre `id_user`, sinon 403. |
 | DELETE | `/api/utilisateurs/{id_user}` | Tous | **Oui** si admin supprime un tiers | Suppression logique (est_supprime=true). Un **Client** ne peut supprimer que son propre compte ; **Admin/Super-Admin** peuvent supprimer n'importe quel compte. Suppression par un admin d'un tiers = logué (action `suppression_utilisateur_tiers`). Réponse : 204 No Content. |
 | GET | `/api/utilisateurs/{id_user}/vault` | Tous | **Oui** si admin consulte un autre `id_user` | Récupère la ligne vault (id_anonyme, date_derniere_activite, consentement_sante_actif) pour l'utilisateur donné. Même règle d'accès : Client = uniquement son compte. |
