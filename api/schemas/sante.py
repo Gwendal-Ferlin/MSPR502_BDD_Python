@@ -67,6 +67,16 @@ class JournalRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class JournalCreate(BaseModel):
+    horodatage: datetime
+    nom_repas: str | None = None
+    type_repas: str | None = None
+    total_calories: float | None = None
+    total_proteines: float | None = None
+    total_glucides: float | None = None
+    total_lipides: float | None = None
+
+
 class SeanceRead(BaseModel):
     id_seance: int
     id_anonyme: UUID
