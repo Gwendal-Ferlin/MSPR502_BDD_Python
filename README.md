@@ -264,6 +264,16 @@ Toutes les routes exigent un token. Pour un **Client**, les données sont limit�
 
 ---
 
+### Journal
+
+Création d'entrées du journal alimentaire (liste via **GET** `/api/sante/journal`).
+
+| Méthode | Chemin | Auth | Logué | Description |
+|--------|--------|------|-------|-------------|
+| POST | `/api/journal` | Oui | Non | Crée une entrée dans le journal alimentaire de l'utilisateur connecté. **Body** : JournalCreate (horodatage, nom_repas, type_repas, total_calories, total_proteines, total_glucides, total_lipides). **Réponse** : 201 + entrée créée (JournalRead). |
+
+---
+
 ### Logs
 
 | Méthode | Chemin | Auth | Logué | Description |
@@ -288,7 +298,8 @@ Toutes les routes exigent un token. Pour un **Client**, les données sont limit�
 - **/** : racine, health (publics).
 - **/api/auth** : login (public).
 - **/api/utilisateurs** : comptes et vault (token + règles par rôle).
-- **/api/sante** : profils, objectifs, journal, séances, référentiels (token + id_anonyme selon rôle).
+- **/api/sante** : profils, objectifs, journal (liste), séances, référentiels (token + id_anonyme selon rôle).
+- **/api/journal** : création d'entrées du journal alimentaire (token).
 - **/api/logs** : evenements (token + id_anonyme selon rôle), config (public).
 - **/api/reco** : recommendations (token + id_anonyme selon rôle).
 
