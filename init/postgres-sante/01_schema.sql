@@ -58,6 +58,7 @@ CREATE TABLE objectif_utilisateur (
     type_objectif VARCHAR(255),
     valeur_cible DOUBLE PRECISION,
     date_debut TIMESTAMPTZ,
+    date_fin TIMESTAMPTZ,
     statut VARCHAR(100)
 );
 

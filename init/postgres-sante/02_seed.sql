@@ -59,11 +59,11 @@ INSERT INTO profil_sante (id_anonyme, annee_naissance, sexe, taille_cm) VALUES
 ('d3bbee22-cf3e-4f01-ee90-9ee2ef6b3d44', 1985, 'H', 182);
 
 -- Objectifs utilisateur
-INSERT INTO objectif_utilisateur (id_anonyme, type_objectif, valeur_cible, date_debut, statut) VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Perte de poids', 58.0, '2025-01-10 00:00:00+01', 'En cours'),
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Calories journalières', 1800.0, '2025-01-10 00:00:00+01', 'En cours'),
-('b1ffcd00-ad1c-4ef9-cc7e-7cc0ce491b22', 'Prise de masse', 78.0, '2025-02-01 00:00:00+01', 'En cours'),
-('c2aadf11-be2d-4ef0-dd8f-8dd1df5a2c33', 'Équilibre nutritionnel', NULL, '2025-01-20 00:00:00+01', 'En cours');
+INSERT INTO objectif_utilisateur (id_anonyme, type_objectif, valeur_cible, date_debut, date_fin, statut) VALUES
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Perte de poids', 58.0, '2025-01-10 00:00:00+01', NULL, 'En cours'),
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Calories journalières', 1800.0, '2025-01-10 00:00:00+01', NULL, 'En cours'),
+('b1ffcd00-ad1c-4ef9-cc7e-7cc0ce491b22', 'Prise de masse', 78.0, '2025-02-01 00:00:00+01', NULL, 'En cours'),
+('c2aadf11-be2d-4ef0-dd8f-8dd1df5a2c33', 'Équilibre nutritionnel', NULL, '2025-01-20 00:00:00+01', NULL, 'En cours');
 
 -- Suivi biométrique
 INSERT INTO suivi_biometrique (id_anonyme, date_releve, poids_kg, score_sommeil) VALUES

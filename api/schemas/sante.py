@@ -25,6 +25,7 @@ class ObjectifRead(BaseModel):
     type_objectif: str | None
     valeur_cible: float | None
     date_debut: datetime | None
+    date_fin: datetime | None = None
     statut: str | None
 
     model_config = {"from_attributes": True}
@@ -34,6 +35,7 @@ class ObjectifUpdate(BaseModel):
     type_objectif: str | None = None
     valeur_cible: float | None = None
     date_debut: datetime | None = None
+    date_fin: datetime | None = None
     statut: str | None = None
 
 
