@@ -1,13 +1,14 @@
+from datetime import date, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from api.auth.dependencies import get_current_user
 from api.db.postgres_sante import get_session_sante
 from api.schemas.auth import CurrentUser
-from api.schemas.sante import JournalCreate, JournalRead
+from api.schemas.sante import CaloriesJourRead, JournalCreate, JournalRead
 
 router = APIRouter(prefix="/journal", tags=["Journal"])
 
@@ -42,4 +43,29 @@ def create_journal_entry(
     ).fetchone()
     db.commit()
     return JournalRead.model_validate(dict(row._mapping))
+
+
+@router.get("/calories/jour", response_model=CaloriesJourRead)
+def get_total_calories_jour(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    date_jour: date = Query(..., description="Jour au format YYYY-MM-DD"),
+    db: Session = Depends(get_session_sante),
+):
+    id_anonyme = str(current_user.id_anonyme)
+    start = datetime.combine(date_jour, datetime.min.time())
+    end = start + timedelta(days=1)
+    row = db.execute(
+        text(
+            """
+            SELECT COALESCE(SUM(total_calories), 0) AS total_calories
+            FROM journal_alimentaire
+            WHERE id_anonyme = :id
+              AND horodatage >= :start
+              AND horodatage < :end
+            """
+        ),
+        {"id": id_anonyme, "start": start, "end": end},
+    ).fetchone()
+    total = float(row._mapping["total_calories"])
+    return CaloriesJourRead(date=date_jour, total_calories=total)
 

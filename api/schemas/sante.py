@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 from pydantic import BaseModel
 
@@ -75,6 +75,11 @@ class JournalCreate(BaseModel):
     total_proteines: float | None = None
     total_glucides: float | None = None
     total_lipides: float | None = None
+
+
+class CaloriesJourRead(BaseModel):
+    date: date
+    total_calories: float
 
 
 class SeanceRead(BaseModel):
