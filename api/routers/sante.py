@@ -15,8 +15,10 @@ from api.schemas.sante import (
     ProfilSanteUpdate,
     ObjectifRead,
     ObjectifUpdate,
+    ObjectifCreate,
     SuiviBiometriqueRead,
     SuiviBiometriqueUpdate,
+    SuiviBiometriqueCreate,
     JournalRead,
     SeanceRead,
     ReferentielRead,
@@ -49,14 +51,14 @@ def list_profils(
             db_logs, current_user, "GET /api/sante/profils", id_anonyme_cible=effective
         )
         rows = db.execute(
-            text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm FROM profil_sante WHERE id_anonyme = :id"),
+            text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante WHERE id_anonyme = :id"),
             {"id": effective},
         ).fetchall()
     else:
         log_admin_consultation_tiers(
             db_logs, current_user, "GET /api/sante/profils", details_extra={"liste_complete": True}
         )
-        rows = db.execute(text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm FROM profil_sante")).fetchall()
+        rows = db.execute(text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante")).fetchall()
     return [ProfilSanteRead.model_validate(dict(r._mapping)) for r in rows]
 
 
@@ -83,11 +85,14 @@ def modifier_mon_profil(
     if body.taille_cm is not None:
         updates.append("taille_cm = :taille_cm")
         params["taille_cm"] = body.taille_cm
+    if body.niveau_activite is not None:
+        updates.append("niveau_activite = :niveau_activite")
+        params["niveau_activite"] = body.niveau_activite
 
     if not updates:
         if row:
             r = db.execute(
-                text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm FROM profil_sante WHERE id_anonyme = :id"),
+                text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante WHERE id_anonyme = :id"),
                 {"id": id_anonyme},
             ).fetchone()
             return ProfilSanteRead.model_validate(dict(r._mapping))
@@ -97,7 +102,7 @@ def modifier_mon_profil(
         )
         db.commit()
         r = db.execute(
-            text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm FROM profil_sante WHERE id_anonyme = :id"),
+            text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante WHERE id_anonyme = :id"),
             {"id": id_anonyme},
         ).fetchone()
         return ProfilSanteRead.model_validate(dict(r._mapping))
@@ -112,13 +117,14 @@ def modifier_mon_profil(
         annee = params.get("annee_naissance")
         sexe = params.get("sexe")
         taille = params.get("taille_cm")
+        niveau = params.get("niveau_activite")
         db.execute(
-            text("INSERT INTO profil_sante (id_anonyme, annee_naissance, sexe, taille_cm) VALUES (:id, :annee_naissance, :sexe, :taille_cm)"),
-            {"id": id_anonyme, "annee_naissance": annee, "sexe": sexe, "taille_cm": taille},
+            text("INSERT INTO profil_sante (id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite) VALUES (:id, :annee_naissance, :sexe, :taille_cm, :niveau_activite)"),
+            {"id": id_anonyme, "annee_naissance": annee, "sexe": sexe, "taille_cm": taille, "niveau_activite": niveau},
         )
     db.commit()
     r = db.execute(
-        text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm FROM profil_sante WHERE id_anonyme = :id"),
+        text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante WHERE id_anonyme = :id"),
         {"id": id_anonyme},
     ).fetchone()
     return ProfilSanteRead.model_validate(dict(r._mapping))
@@ -146,6 +152,36 @@ def list_objectifs(
         )
         rows = db.execute(text("SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut FROM objectif_utilisateur")).fetchall()
     return [ObjectifRead.model_validate(dict(r._mapping)) for r in rows]
+
+
+@router.post("/objectifs", response_model=ObjectifRead, status_code=status.HTTP_201_CREATED)
+def create_objectif(
+    body: ObjectifCreate,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Session = Depends(get_session_sante),
+):
+    """Crée un objectif pour l'utilisateur connecté."""
+    id_anonyme = str(current_user.id_anonyme)
+    row = db.execute(
+        text(
+            """
+            INSERT INTO objectif_utilisateur (id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut)
+            VALUES (:id_anonyme, :type_objectif, :valeur_cible, :unite, :date_debut, :date_fin, :statut)
+            RETURNING id_objectif_u, id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut
+            """
+        ),
+        {
+            "id_anonyme": id_anonyme,
+            "type_objectif": body.type_objectif,
+            "valeur_cible": body.valeur_cible,
+            "unite": body.unite,
+            "date_debut": body.date_debut,
+            "date_fin": body.date_fin,
+            "statut": body.statut,
+        },
+    ).fetchone()
+    db.commit()
+    return ObjectifRead.model_validate(dict(row._mapping))
 
 
 @router.patch("/objectifs/{id_objectif_u}", response_model=ObjectifRead)
@@ -260,6 +296,33 @@ def list_suivi_biometrique(
         )
         rows = db.execute(text("SELECT id_biometrie, id_anonyme, date_releve, poids_kg, score_sommeil FROM suivi_biometrique ORDER BY date_releve DESC")).fetchall()
     return [SuiviBiometriqueRead.model_validate(dict(r._mapping)) for r in rows]
+
+
+@router.post("/suivi-biometrique", response_model=SuiviBiometriqueRead, status_code=status.HTTP_201_CREATED)
+def create_suivi_biometrique(
+    body: SuiviBiometriqueCreate,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Session = Depends(get_session_sante),
+):
+    """Crée un relevé biométrique pour l'utilisateur connecté."""
+    id_anonyme = str(current_user.id_anonyme)
+    row = db.execute(
+        text(
+            """
+            INSERT INTO suivi_biometrique (id_anonyme, date_releve, poids_kg, score_sommeil)
+            VALUES (:id_anonyme, :date_releve, :poids_kg, :score_sommeil)
+            RETURNING id_biometrie, id_anonyme, date_releve, poids_kg, score_sommeil
+            """
+        ),
+        {
+            "id_anonyme": id_anonyme,
+            "date_releve": body.date_releve,
+            "poids_kg": body.poids_kg,
+            "score_sommeil": body.score_sommeil,
+        },
+    ).fetchone()
+    db.commit()
+    return SuiviBiometriqueRead.model_validate(dict(row._mapping))
 
 
 @router.patch("/suivi-biometrique/{id_biometrie}", response_model=SuiviBiometriqueRead)

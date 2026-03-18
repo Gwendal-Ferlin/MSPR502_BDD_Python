@@ -43,7 +43,8 @@ CREATE TABLE profil_sante (
     id_anonyme UUID NOT NULL UNIQUE,
     annee_naissance INTEGER,
     sexe VARCHAR(50),
-    taille_cm INTEGER
+    taille_cm INTEGER,
+    niveau_activite VARCHAR(50)
 );
 
 CREATE INDEX idx_profil_sante_id_anonyme ON profil_sante(id_anonyme);

@@ -52,11 +52,11 @@ INSERT INTO exercice_materiel (id_exercice, id_materiel) VALUES
 (8, 1), (8, 2);   -- Curl: haltères, barre
 
 -- Profils santé (1 par utilisateur - mêmes UUIDs que vault)
-INSERT INTO profil_sante (id_anonyme, annee_naissance, sexe, taille_cm) VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 1992, 'F', 165),
-('b1ffcd00-ad1c-4ef9-cc7e-7cc0ce491b22', 1988, 'H', 178),
-('c2aadf11-be2d-4ef0-dd8f-8dd1df5a2c33', 1995, 'F', 172),
-('d3bbee22-cf3e-4f01-ee90-9ee2ef6b3d44', 1985, 'H', 182);
+INSERT INTO profil_sante (id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite) VALUES
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 1992, 'F', 165, 'Modéré'),
+('b1ffcd00-ad1c-4ef9-cc7e-7cc0ce491b22', 1988, 'H', 178, 'Élevé'),
+('c2aadf11-be2d-4ef0-dd8f-8dd1df5a2c33', 1995, 'F', 172, 'Faible'),
+('d3bbee22-cf3e-4f01-ee90-9ee2ef6b3d44', 1985, 'H', 182, 'Modéré');
 
 -- Objectifs utilisateur
 INSERT INTO objectif_utilisateur (id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut) VALUES

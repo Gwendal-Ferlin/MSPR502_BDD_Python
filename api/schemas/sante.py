@@ -9,6 +9,7 @@ class ProfilSanteRead(BaseModel):
     annee_naissance: int | None
     sexe: str | None
     taille_cm: int | None
+    niveau_activite: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -17,6 +18,7 @@ class ProfilSanteUpdate(BaseModel):
     annee_naissance: int | None = None
     sexe: str | None = None
     taille_cm: int | None = None
+    niveau_activite: str | None = None
 
 
 class ObjectifRead(BaseModel):
@@ -41,6 +43,15 @@ class ObjectifUpdate(BaseModel):
     statut: str | None = None
 
 
+class ObjectifCreate(BaseModel):
+    type_objectif: str | None = None
+    valeur_cible: float | None = None
+    unite: str | None = None
+    date_debut: datetime | None = None
+    date_fin: datetime | None = None
+    statut: str | None = None
+
+
 class SuiviBiometriqueRead(BaseModel):
     id_biometrie: int
     id_anonyme: UUID
@@ -53,6 +64,12 @@ class SuiviBiometriqueRead(BaseModel):
 
 class SuiviBiometriqueUpdate(BaseModel):
     date_releve: datetime | None = None
+    poids_kg: float | None = None
+    score_sommeil: int | None = None
+
+
+class SuiviBiometriqueCreate(BaseModel):
+    date_releve: datetime
     poids_kg: float | None = None
     score_sommeil: int | None = None
 
