@@ -319,6 +319,8 @@ Création d'entrées du journal alimentaire (liste via **GET** `/api/sante/journ
 | Méthode | Chemin | Auth | Logué | Description |
 |--------|--------|------|-------|-------------|
 | GET | `/api/reco/recommendations` | Oui | **Oui** si admin filtre par un `id_anonyme` tiers | Liste les recommandations. **Client** : uniquement les siennes. **Admin/Super-Admin** : tous, avec filtre optionnel. **Query** : `id_anonyme` (optionnel), `type` (optionnel, ex. "nutrition", "activite"). Limite 50, tri par `created_at` décroissant. |
+| GET | `/api/reco/repas` | Oui | **Oui** si admin filtre par un `id_anonyme` tiers | Liste les repas (recettes) de l'utilisateur. **Client** : les siens. **Admin/Super-Admin** : tous, avec **Query** `id_anonyme` (optionnel). Limite 100, tri par `created_at` décroissant. |
+| GET | `/api/reco/repas/{repas_id}` | Oui | Non | Récupère un repas par son id (ObjectId MongoDB). Le repas doit appartenir à l'utilisateur connecté ; Admin/Super-Admin peuvent accéder à tout. 403 si accès interdit, 404 si inexistant. |
 | POST | `/api/reco/repas` | Oui | Non | Crée un repas (recette) pour l'utilisateur connecté, lié à son `id_anonyme`. **Body** : `nom_repas`, `aliments` (objet clé-valeur : nom aliment → dosage avec unité, ex. `{"Poulet": "150 g", "Riz": "200 g"}`), `total_calories`, `lipides`, `glucides`, `proteines`. **Réponse** : 201 + RepasRead (id, id_anonyme, nom_repas, aliments, totaux, created_at). |
 
 ---
@@ -331,7 +333,7 @@ Création d'entrées du journal alimentaire (liste via **GET** `/api/sante/journ
 - **/api/sante** : profils, objectifs, journal (liste), séances, référentiels (token + id_anonyme selon rôle).
 - **/api/journal** : création d'entrées du journal alimentaire + total calories jour (token).
 - **/api/logs** : evenements (token + id_anonyme selon rôle), config (public).
-- **/api/reco** : recommendations (token + id_anonyme selon rôle), POST repas (recettes liées à l'utilisateur connecté).
+- **/api/reco** : recommendations et repas (liste + détail + création), token + id_anonyme selon rôle.
 
 Documentation interactive (Swagger) : **GET** `/docs`.
 

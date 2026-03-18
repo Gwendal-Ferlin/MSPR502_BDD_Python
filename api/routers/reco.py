@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pymongo.database import Database
+from bson import ObjectId
 
 from api.auth.dependencies import get_current_user
 from api.db.mongo_reco import get_mongo_reco
@@ -42,6 +43,63 @@ def list_recommendations(
     return out
 
 
+def _repas_doc_to_read(doc: dict) -> RepasRead:
+    """Convertit un document MongoDB repas en RepasRead."""
+    return RepasRead(
+        id=str(doc["_id"]),
+        id_anonyme=str(doc.get("id_anonyme", "")),
+        nom_repas=doc.get("nom_repas", ""),
+        aliments=doc.get("aliments", {}),
+        total_calories=doc.get("total_calories"),
+        lipides=doc.get("lipides"),
+        glucides=doc.get("glucides"),
+        proteines=doc.get("proteines"),
+        created_at=doc.get("created_at"),
+    )
+
+
+@router.get("/repas", response_model=list[RepasRead])
+def list_repas(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    id_anonyme: str | None = Query(None),
+    db: Database = Depends(get_mongo_reco),
+    db_logs: Database = Depends(get_mongo_logs),
+):
+    """Liste les repas (recettes) de l'utilisateur. Client : les siens ; Admin : avec id_anonyme optionnel."""
+    coll = db["repas"]
+    q = {}
+    if current_user.role in ("Admin", "Super-Admin"):
+        if id_anonyme:
+            q["id_anonyme"] = id_anonyme
+            log_admin_consultation_tiers(
+                db_logs, current_user, "GET /api/reco/repas", id_anonyme_cible=id_anonyme
+            )
+    else:
+        q["id_anonyme"] = current_user.id_anonyme
+    cursor = coll.find(q).sort("created_at", -1).limit(100)
+    return [_repas_doc_to_read(doc) for doc in cursor]
+
+
+@router.get("/repas/{repas_id}", response_model=RepasRead)
+def get_repas(
+    repas_id: str,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Database = Depends(get_mongo_reco),
+):
+    """Récupère un repas par son id. Le repas doit appartenir à l'utilisateur connecté (ou Admin/Super-Admin)."""
+    try:
+        oid = ObjectId(repas_id)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repas non trouvé")
+    coll = db["repas"]
+    doc = coll.find_one({"_id": oid})
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repas non trouvé")
+    if current_user.role not in ("Admin", "Super-Admin") and doc.get("id_anonyme") != current_user.id_anonyme:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants")
+    return _repas_doc_to_read(doc)
+
+
 @router.post("/repas", response_model=RepasRead, status_code=status.HTTP_201_CREATED)
 def create_repas(
     body: RepasCreate,
@@ -66,4 +124,4 @@ def create_repas(
     doc["id"] = str(result.inserted_id)
     doc["id_anonyme"] = str(doc["id_anonyme"])
     doc["created_at"] = now
-    return RepasRead.model_validate({k: doc.get(k) for k in RepasRead.model_fields})
+    return _repas_doc_to_read(doc)
