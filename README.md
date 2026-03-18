@@ -79,6 +79,13 @@ docker cp init/postgres-utilisateur/04_migration_abonnement.sql postgres-utilisa
 docker exec postgres-utilisateur psql -U utilisateur_user -d utilisateur_db -f /tmp/04_migration_abonnement.sql
 ```
 
+**6) Migration objectifs (Postgres santé déjà existant) :**  
+À exécuter si la base `sante_db` existe déjà sans la colonne `date_fin` dans `objectif_utilisateur`.
+```bash
+docker cp init/postgres-sante/03_migration_objectif_date_fin.sql postgres-sante:/tmp/
+docker exec postgres-sante psql -U sante_user -d sante_db -f /tmp/03_migration_objectif_date_fin.sql
+```
+
 Pour des bases déjà créées en local (volumes existants) sans init auto, les mêmes commandes Postgres/Mongo ci-dessus s’appliquent.
 
 ---
@@ -129,6 +136,7 @@ erDiagram
         string type_objectif
         float valeur_cible
         datetime date_debut
+        datetime date_fin
         string statut
     }
     SUIVI_BIOMETRIQUE {
@@ -251,7 +259,7 @@ Toutes les routes exigent un token. Pour un **Client**, les données sont limit�
 | GET | `/api/sante/profils` | `id_anonyme` (optionnel, UUID) | **Oui** si admin consulte un tiers ou liste complète | Liste les profils santé. Sans paramètre (Admin) = tous ; avec `id_anonyme` ou implicite (Client) = filtré. |
 | PATCH | `/api/sante/profils` | — | Non | Met à jour le profil santé de l'utilisateur connecté (annee_naissance, sexe, taille_cm). Crée le profil s'il n'existe pas. **Body** : ProfilSanteUpdate. |
 | GET | `/api/sante/objectifs` | `id_anonyme` (optionnel, UUID) | **Oui** si admin consulte un tiers ou liste complète | Liste les objectifs utilisateur. Même logique de filtrage. |
-| PATCH | `/api/sante/objectifs/{id_objectif_u}` | — | Non | Met à jour un objectif de l'utilisateur connecté. **Body** : ObjectifUpdate. |
+| PATCH | `/api/sante/objectifs/{id_objectif_u}` | — | Non | Met à jour un objectif de l'utilisateur connecté. **Body** : ObjectifUpdate (inclut `date_fin`). |
 | GET | `/api/sante/suivi-biometrique` | `id_anonyme` (optionnel, UUID) | **Oui** si admin consulte un tiers ou liste complète | Liste les relevés biométriques. |
 | PATCH | `/api/sante/suivi-biometrique/{id_biometrie}` | — | Non | Met à jour un relevé biométrique de l'utilisateur connecté. **Body** : SuiviBiometriqueUpdate. |
 | GET | `/api/sante/mes-restrictions` | — | Non | Liste les restrictions associées à l'utilisateur connecté. |
@@ -271,6 +279,7 @@ Création d'entrées du journal alimentaire (liste via **GET** `/api/sante/journ
 | Méthode | Chemin | Auth | Logué | Description |
 |--------|--------|------|-------|-------------|
 | POST | `/api/journal` | Oui | Non | Crée une entrée dans le journal alimentaire de l'utilisateur connecté. **Body** : JournalCreate (horodatage, nom_repas, type_repas, total_calories, total_proteines, total_glucides, total_lipides). **Réponse** : 201 + entrée créée (JournalRead). |
+| GET | `/api/journal/calories/jour` | Oui | Non | Retourne le total de calories pour la journée de l'utilisateur connecté. **Query** : `date_jour=YYYY-MM-DD`. **Réponse** : `{date, total_calories}`. |
 
 ---
 
@@ -299,7 +308,7 @@ Création d'entrées du journal alimentaire (liste via **GET** `/api/sante/journ
 - **/api/auth** : login (public).
 - **/api/utilisateurs** : comptes et vault (token + règles par rôle).
 - **/api/sante** : profils, objectifs, journal (liste), séances, référentiels (token + id_anonyme selon rôle).
-- **/api/journal** : création d'entrées du journal alimentaire (token).
+- **/api/journal** : création d'entrées du journal alimentaire + total calories jour (token).
 - **/api/logs** : evenements (token + id_anonyme selon rôle), config (public).
 - **/api/reco** : recommendations (token + id_anonyme selon rôle).
 
