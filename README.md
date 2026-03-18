@@ -86,6 +86,13 @@ docker cp init/postgres-sante/03_migration_objectif_date_fin.sql postgres-sante:
 docker exec postgres-sante psql -U sante_user -d sante_db -f /tmp/03_migration_objectif_date_fin.sql
 ```
 
+**7) Migration unité objectifs (Postgres santé déjà existant) :**  
+À exécuter si la base `sante_db` existe déjà sans la colonne `unite` dans `objectif_utilisateur`.
+```bash
+docker cp init/postgres-sante/04_migration_objectif_unite.sql postgres-sante:/tmp/
+docker exec postgres-sante psql -U sante_user -d sante_db -f /tmp/04_migration_objectif_unite.sql
+```
+
 Pour des bases déjà créées en local (volumes existants) sans init auto, les mêmes commandes Postgres/Mongo ci-dessus s’appliquent.
 
 ---
@@ -135,6 +142,7 @@ erDiagram
         uuid id_anonyme FK
         string type_objectif
         float valeur_cible
+        string unite
         datetime date_debut
         datetime date_fin
         string statut
@@ -259,7 +267,7 @@ Toutes les routes exigent un token. Pour un **Client**, les données sont limit�
 | GET | `/api/sante/profils` | `id_anonyme` (optionnel, UUID) | **Oui** si admin consulte un tiers ou liste complète | Liste les profils santé. Sans paramètre (Admin) = tous ; avec `id_anonyme` ou implicite (Client) = filtré. |
 | PATCH | `/api/sante/profils` | — | Non | Met à jour le profil santé de l'utilisateur connecté (annee_naissance, sexe, taille_cm). Crée le profil s'il n'existe pas. **Body** : ProfilSanteUpdate. |
 | GET | `/api/sante/objectifs` | `id_anonyme` (optionnel, UUID) | **Oui** si admin consulte un tiers ou liste complète | Liste les objectifs utilisateur. Même logique de filtrage. |
-| PATCH | `/api/sante/objectifs/{id_objectif_u}` | — | Non | Met à jour un objectif de l'utilisateur connecté. **Body** : ObjectifUpdate (inclut `date_fin`). |
+| PATCH | `/api/sante/objectifs/{id_objectif_u}` | — | Non | Met à jour un objectif de l'utilisateur connecté. **Body** : ObjectifUpdate (inclut `date_fin` et `unite`). |
 | GET | `/api/sante/suivi-biometrique` | `id_anonyme` (optionnel, UUID) | **Oui** si admin consulte un tiers ou liste complète | Liste les relevés biométriques. |
 | PATCH | `/api/sante/suivi-biometrique/{id_biometrie}` | — | Non | Met à jour un relevé biométrique de l'utilisateur connecté. **Body** : SuiviBiometriqueUpdate. |
 | GET | `/api/sante/mes-restrictions` | — | Non | Liste les restrictions associées à l'utilisateur connecté. |

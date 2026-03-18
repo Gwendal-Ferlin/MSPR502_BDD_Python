@@ -137,14 +137,14 @@ def list_objectifs(
             db_logs, current_user, "GET /api/sante/objectifs", id_anonyme_cible=effective
         )
         rows = db.execute(
-            text("SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, date_debut, date_fin, statut FROM objectif_utilisateur WHERE id_anonyme = :id"),
+            text("SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut FROM objectif_utilisateur WHERE id_anonyme = :id"),
             {"id": effective},
         ).fetchall()
     else:
         log_admin_consultation_tiers(
             db_logs, current_user, "GET /api/sante/objectifs", details_extra={"liste_complete": True}
         )
-        rows = db.execute(text("SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, date_debut, date_fin, statut FROM objectif_utilisateur")).fetchall()
+        rows = db.execute(text("SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut FROM objectif_utilisateur")).fetchall()
     return [ObjectifRead.model_validate(dict(r._mapping)) for r in rows]
 
 
@@ -171,6 +171,9 @@ def modifier_objectif(
     if body.valeur_cible is not None:
         updates.append("valeur_cible = :valeur_cible")
         params["valeur_cible"] = body.valeur_cible
+    if body.unite is not None:
+        updates.append("unite = :unite")
+        params["unite"] = body.unite
     if body.date_debut is not None:
         updates.append("date_debut = :date_debut")
         params["date_debut"] = body.date_debut
@@ -182,7 +185,7 @@ def modifier_objectif(
         params["statut"] = body.statut
     if not updates:
         r = db.execute(
-            text("SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, date_debut, date_fin, statut FROM objectif_utilisateur WHERE id_objectif_u = :id"),
+            text("SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut FROM objectif_utilisateur WHERE id_objectif_u = :id"),
             {"id": id_objectif_u},
         ).fetchone()
         return ObjectifRead.model_validate(dict(r._mapping))
@@ -190,7 +193,7 @@ def modifier_objectif(
     db.execute(text(f"UPDATE objectif_utilisateur SET {set_clause} WHERE id_objectif_u = :id"), params)
     db.commit()
     r = db.execute(
-        text("SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, date_debut, date_fin, statut FROM objectif_utilisateur WHERE id_objectif_u = :id"),
+        text("SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut FROM objectif_utilisateur WHERE id_objectif_u = :id"),
         {"id": id_objectif_u},
     ).fetchone()
     return ObjectifRead.model_validate(dict(r._mapping))

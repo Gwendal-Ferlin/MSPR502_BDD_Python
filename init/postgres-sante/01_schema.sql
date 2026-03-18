@@ -57,6 +57,7 @@ CREATE TABLE objectif_utilisateur (
     id_anonyme UUID NOT NULL,
     type_objectif VARCHAR(255),
     valeur_cible DOUBLE PRECISION,
+    unite VARCHAR(50),
     date_debut TIMESTAMPTZ,
     date_fin TIMESTAMPTZ,
     statut VARCHAR(100)
