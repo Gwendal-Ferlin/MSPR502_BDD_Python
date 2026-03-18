@@ -12,6 +12,14 @@ if (!db.getCollectionNames().includes("recommendations")) {
   db.recommendations.createIndex({ created_at: 1 });
 }
 
+// Collection repas - recettes/repas par utilisateur (id_anonyme)
+// aliments: clé = nom aliment, valeur = dosage avec unité (ex: "150 g", "2 unités")
+if (!db.getCollectionNames().includes("repas")) {
+  db.createCollection("repas");
+  db.repas.createIndex({ id_anonyme: 1 });
+  db.repas.createIndex({ created_at: -1 });
+}
+
 // ---- JEU DE DONNÉES (si collection vide) ----
 const UUID_MARIE = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
 const UUID_LUCAS = "b1ffcd00-ad1c-4ef9-cc7e-7cc0ce491b22";

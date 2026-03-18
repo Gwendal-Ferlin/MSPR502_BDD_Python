@@ -211,9 +211,11 @@ erDiagram
 | **PostgreSQL** `utilisateur_db` | `compte_utilisateur`, `vault_correspondance` (lien id_user ↔ id_anonyme) |
 | **PostgreSQL** `sante_db`       | Profil santé, objectifs, suivi biométrique, journal alimentaire, séances, référentiels (restrictions, exercices, matériel), tables de liaison |
 | **MongoDB** `logs_config`      | Événements / logs (collection `evenements`) et config |
-| **MongoDB** `reco`             | Données pour les recommandations |
+| **MongoDB** `reco`             | Recommandations (collection `recommendations`), repas/recettes par utilisateur (collection `repas`) |
 
 Le **vault** fait le lien RGPD entre l’identifiant nominatif (`id_user`) et l’identifiant anonyme (`id_anonyme`) utilisé partout en base Santé et dans les logs.
+
+**Collection `repas` (MongoDB reco)** : repas/recettes par utilisateur. Chaque document contient `id_anonyme` (UUID), `nom_repas`, `aliments` (objet clé-valeur : nom aliment → dosage avec unité, ex. `"Poulet": "150 g"`), `total_calories`, `lipides`, `glucides`, `proteines`, `created_at`.
 
 ---
 
@@ -317,6 +319,7 @@ Création d'entrées du journal alimentaire (liste via **GET** `/api/sante/journ
 | Méthode | Chemin | Auth | Logué | Description |
 |--------|--------|------|-------|-------------|
 | GET | `/api/reco/recommendations` | Oui | **Oui** si admin filtre par un `id_anonyme` tiers | Liste les recommandations. **Client** : uniquement les siennes. **Admin/Super-Admin** : tous, avec filtre optionnel. **Query** : `id_anonyme` (optionnel), `type` (optionnel, ex. "nutrition", "activite"). Limite 50, tri par `created_at` décroissant. |
+| POST | `/api/reco/repas` | Oui | Non | Crée un repas (recette) pour l'utilisateur connecté, lié à son `id_anonyme`. **Body** : `nom_repas`, `aliments` (objet clé-valeur : nom aliment → dosage avec unité, ex. `{"Poulet": "150 g", "Riz": "200 g"}`), `total_calories`, `lipides`, `glucides`, `proteines`. **Réponse** : 201 + RepasRead (id, id_anonyme, nom_repas, aliments, totaux, created_at). |
 
 ---
 
@@ -328,7 +331,7 @@ Création d'entrées du journal alimentaire (liste via **GET** `/api/sante/journ
 - **/api/sante** : profils, objectifs, journal (liste), séances, référentiels (token + id_anonyme selon rôle).
 - **/api/journal** : création d'entrées du journal alimentaire + total calories jour (token).
 - **/api/logs** : evenements (token + id_anonyme selon rôle), config (public).
-- **/api/reco** : recommendations (token + id_anonyme selon rôle).
+- **/api/reco** : recommendations (token + id_anonyme selon rôle), POST repas (recettes liées à l'utilisateur connecté).
 
 Documentation interactive (Swagger) : **GET** `/docs`.
 
