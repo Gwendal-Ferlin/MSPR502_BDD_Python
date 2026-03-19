@@ -124,6 +124,11 @@ class MesRestrictionsUpdate(BaseModel):
     id_restrictions: list[int]
 
 
+class MesMaterielUpdate(BaseModel):
+    """Liste des id_materiel à associer à l'utilisateur (remplace le matériel actuel)."""
+    id_materiels: list[int]
+
+
 class ReferentielRead(BaseModel):
     id: int
     nom: str

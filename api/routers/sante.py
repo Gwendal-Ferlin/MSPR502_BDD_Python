@@ -24,6 +24,7 @@ from api.schemas.sante import (
     ReferentielRead,
     RestrictionRead,
     MesRestrictionsUpdate,
+    MesMaterielUpdate,
 )
 from api.services.log_admin import log_admin_consultation_tiers
 
@@ -411,6 +412,52 @@ def modifier_mes_restrictions(
         {"id": id_anonyme},
     ).fetchall()
     return [RestrictionRead.model_validate(dict(r._mapping)) for r in rows]
+
+
+@router.get("/mes-materiel", response_model=list[ReferentielRead])
+def list_mes_materiel(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Session = Depends(get_session_sante),
+):
+    """Liste le matériel associé à l'utilisateur connecté (id + nom)."""
+    id_anonyme = str(current_user.id_anonyme)
+    rows = db.execute(
+        text("""
+            SELECT m.id_materiel AS id, m.nom
+            FROM materiel m
+            INNER JOIN utilisateur_materiel um ON um.id_materiel = m.id_materiel
+            WHERE um.id_anonyme = :id
+        """),
+        {"id": id_anonyme},
+    ).fetchall()
+    return [ReferentielRead.model_validate(dict(r._mapping)) for r in rows]
+
+
+@router.put("/mes-materiel", response_model=list[ReferentielRead])
+def modifier_mes_materiel(
+    body: MesMaterielUpdate,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Session = Depends(get_session_sante),
+):
+    """Remplace le matériel de l'utilisateur connecté par la liste fournie (id_materiels)."""
+    id_anonyme = str(current_user.id_anonyme)
+    db.execute(text("DELETE FROM utilisateur_materiel WHERE id_anonyme = :id"), {"id": id_anonyme})
+    for id_materiel in body.id_materiels:
+        db.execute(
+            text("INSERT INTO utilisateur_materiel (id_anonyme, id_materiel) VALUES (:aid, :mid) ON CONFLICT (id_anonyme, id_materiel) DO NOTHING"),
+            {"aid": id_anonyme, "mid": id_materiel},
+        )
+    db.commit()
+    rows = db.execute(
+        text("""
+            SELECT m.id_materiel AS id, m.nom
+            FROM materiel m
+            INNER JOIN utilisateur_materiel um ON um.id_materiel = m.id_materiel
+            WHERE um.id_anonyme = :id
+        """),
+        {"id": id_anonyme},
+    ).fetchall()
+    return [ReferentielRead.model_validate(dict(r._mapping)) for r in rows]
 
 
 @router.get("/referentiels/restrictions", response_model=list[RestrictionRead])
