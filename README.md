@@ -135,6 +135,7 @@ erDiagram
     VAULT_CORRESPONDANCE ||--o{ SUIVI_BIOMETRIQUE : "mesure"
     VAULT_CORRESPONDANCE ||--o{ JOURNAL_ALIMENTAIRE : "enregistre"
     VAULT_CORRESPONDANCE ||--o{ SEANCE_ACTIVITE : "pratique"
+    VAULT_CORRESPONDANCE ||--o{ REPAS : "prépare"
     VAULT_CORRESPONDANCE }o--o{ REF_RESTRICTION : "est sujet à"
     VAULT_CORRESPONDANCE }o--o{ MATERIEL : "possède"
     PROFIL_SANTE {
@@ -172,6 +173,17 @@ erDiagram
         float total_proteines
         float total_glucides
         float total_lipides
+    }
+    REPAS {
+        string id PK
+        uuid id_anonyme FK
+        string nom_repas
+        object aliments
+        float total_calories
+        float lipides
+        float glucides
+        float proteines
+        datetime created_at
     }
     SEANCE_ACTIVITE {
         int id_seance PK
