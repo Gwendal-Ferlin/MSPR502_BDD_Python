@@ -49,6 +49,7 @@ services:
       - "27017:27017"
     volumes:
       - mongo_logs_data:/data/db
+      - ./init/mongodb-logs:/docker-entrypoint-initdb.d:ro
     networks:
       - mspr502-network
     healthcheck:
@@ -66,6 +67,7 @@ services:
       - "27018:27017"
     volumes:
       - mongo_reco_data:/data/db
+      - ./init/mongodb-reco:/docker-entrypoint-initdb.d:ro
     networks:
       - mspr502-network
     healthcheck:

@@ -32,6 +32,16 @@ docker compose up -d --build
 
 Les services démarrent dans cet ordre : Postgres (utilisateur + santé), MongoDB (logs + reco), puis l’API une fois les bases healthy.
 
+### Ports exposés (hôte → conteneur)
+
+| Service | Port hôte | Port conteneur | Remarque |
+|---|---:|---:|---|
+| API (`api`) | 8000 | 8000 | FastAPI / Swagger |
+| Postgres utilisateur (`postgres-utilisateur`) | 5432 | 5432 | DB `utilisateur_db` |
+| Postgres santé (`postgres-sante`) | 5433 | 5432 | DB `sante_db` |
+| Mongo logs (`mongodb-logs`) | 27017 | 27017 | DB `logs_config` |
+| Mongo reco (`mongodb-reco`) | 27018 | 27017 | DB `reco` |
+
 ### Arrêt
 
 ```bash
@@ -214,6 +224,167 @@ erDiagram
         string nom
     }
     REF_EXERCICE }o--o{ MATERIEL : "nécessite"
+```
+
+### Schémas par base (Mermaid)
+
+#### PostgreSQL — `utilisateur_db`
+
+```mermaid
+erDiagram
+    COMPTE_UTILISATEUR ||--|| VAULT_CORRESPONDANCE : "identifie"
+    COMPTE_UTILISATEUR {
+        int id_user PK
+        string email
+        string password
+        string role
+        string type_abonnement
+        datetime date_consentement_rgpd
+        boolean est_supprime
+        datetime date_fin_periode_payee
+        boolean desabonnement_a_fin_periode
+    }
+    VAULT_CORRESPONDANCE {
+        uuid id_anonyme PK
+        int id_user FK
+        datetime date_derniere_activite
+        boolean consentement_sante_actif
+    }
+```
+
+#### PostgreSQL — `sante_db`
+
+```mermaid
+erDiagram
+    PROFIL_SANTE {
+        int id_profil PK
+        uuid id_anonyme
+        int annee_naissance
+        string sexe
+        int taille_cm
+        string niveau_activite
+    }
+    OBJECTIF_UTILISATEUR {
+        int id_objectif_u PK
+        uuid id_anonyme
+        string type_objectif
+        float valeur_cible
+        string unite
+        datetime date_debut
+        datetime date_fin
+        string statut
+    }
+    SUIVI_BIOMETRIQUE {
+        int id_biometrie PK
+        uuid id_anonyme
+        datetime date_releve
+        float poids_kg
+        int score_sommeil
+    }
+    JOURNAL_ALIMENTAIRE {
+        int id_repas PK
+        uuid id_anonyme
+        datetime horodatage
+        string nom_repas
+        string type_repas
+        float total_calories
+        float total_proteines
+        float total_glucides
+        float total_lipides
+    }
+    SEANCE_ACTIVITE {
+        int id_seance PK
+        uuid id_anonyme
+        datetime horodatage
+        string nom_seance
+        int ressenti_effort_RPE
+    }
+    DETAIL_PERFORMANCE {
+        int id_performance PK
+        int id_seance FK
+        int id_exercice FK
+        int series
+        int reps
+        float charge_kg
+    }
+    REF_RESTRICTION {
+        int id_restriction PK
+        string nom
+        string type
+    }
+    REF_EXERCICE {
+        int id_exercice PK
+        string nom
+        string muscle_principal
+    }
+    MATERIEL {
+        int id_materiel PK
+        string nom
+    }
+    EXERCICE_MATERIEL {
+        int id_exercice PK
+        int id_materiel PK
+    }
+    UTILISATEUR_RESTRICTION {
+        uuid id_anonyme PK
+        int id_restriction PK
+    }
+    UTILISATEUR_MATERIEL {
+        uuid id_anonyme PK
+        int id_materiel PK
+    }
+
+    SEANCE_ACTIVITE ||--|{ DETAIL_PERFORMANCE : "détaille"
+    REF_EXERCICE ||--o{ DETAIL_PERFORMANCE : "exécuté"
+    REF_EXERCICE }o--o{ MATERIEL : "nécessite"
+    REF_RESTRICTION }o--o{ UTILISATEUR_RESTRICTION : "associe"
+    MATERIEL }o--o{ UTILISATEUR_MATERIEL : "associe"
+```
+
+#### MongoDB — `logs_config`
+
+```mermaid
+erDiagram
+    EVENEMENTS {
+        string _id PK
+        string id_log
+        datetime timestamp
+        uuid id_anonyme
+        string action
+        object details_techniques
+    }
+    CONFIG {
+        string _id PK
+        string cle
+        object valeur
+        string description
+    }
+```
+
+#### MongoDB — `reco`
+
+```mermaid
+erDiagram
+    RECOMMENDATIONS {
+        string _id PK
+        uuid id_anonyme
+        string type
+        string titre
+        string contenu
+        datetime created_at
+        float score
+    }
+    REPAS {
+        string _id PK
+        uuid id_anonyme
+        string nom_repas
+        object aliments
+        float total_calories
+        float lipides
+        float glucides
+        float proteines
+        datetime created_at
+    }
 ```
 
 ### Bases et rôles
