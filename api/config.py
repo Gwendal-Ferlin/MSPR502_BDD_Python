@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     postgres_sante_password: str = ""
     postgres_sante_db: str = "sante_db"
 
+    # PostgreSQL Gamification
+    postgres_gamification_host: str = "localhost"
+    postgres_gamification_port: int = 5434
+    postgres_gamification_user: str = "gamification_user"
+    postgres_gamification_password: str = ""
+    postgres_gamification_db: str = "gamification_db"
+
     # MongoDB Logs
     mongodb_logs_host: str = "localhost"
     mongodb_logs_port: int = 27017
@@ -49,6 +56,13 @@ class Settings(BaseSettings):
         return (
             f"postgresql://{self.postgres_sante_user}:{self.postgres_sante_password}"
             f"@{self.postgres_sante_host}:{self.postgres_sante_port}/{self.postgres_sante_db}"
+        )
+
+    @property
+    def postgres_gamification_url(self) -> str:
+        return (
+            f"postgresql://{self.postgres_gamification_user}:{self.postgres_gamification_password}"
+            f"@{self.postgres_gamification_host}:{self.postgres_gamification_port}/{self.postgres_gamification_db}"
         )
 
     @property

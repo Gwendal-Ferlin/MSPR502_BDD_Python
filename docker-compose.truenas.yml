@@ -1,5 +1,5 @@
 # TrueNAS / serveur : bases vides, pas de montage init (évite Permission denied sur ZFS).
-# Après "docker compose up", initialiser les 4 BDD à la main (voir README) :
+# Après "docker compose up", initialiser les BDD à la main (voir README) :
 #
 # 1) Postgres utilisateur (schéma + seed si besoin) :
 #   docker cp init/postgres-utilisateur/01_schema.sql postgres-utilisateur:/tmp/
@@ -13,11 +13,17 @@
 #   docker cp init/postgres-sante/02_seed.sql postgres-sante:/tmp/
 #   docker exec postgres-sante psql -U sante_user -d sante_db -f /tmp/02_seed.sql
 #
-# 3) MongoDB logs :
+# 3) Postgres gamification (schéma + seed si besoin) :
+#   docker cp init/postgres-gamification/01_schema.sql postgres-gamification:/tmp/
+#   docker exec postgres-gamification psql -U gamification_user -d gamification_db -f /tmp/01_schema.sql
+#   docker cp init/postgres-gamification/02_seed.sql postgres-gamification:/tmp/
+#   docker exec postgres-gamification psql -U gamification_user -d gamification_db -f /tmp/02_seed.sql
+#
+# 4) MongoDB logs :
 #   docker cp init/mongodb-logs/init.js mongodb-logs:/tmp/
 #   docker exec mongodb-logs mongosh logs_config --file /tmp/init.js
 #
-# 4) MongoDB reco :
+# 5) MongoDB reco :
 #   docker cp init/mongodb-reco/init.js mongodb-reco:/tmp/
 #   docker exec mongodb-reco mongosh reco --file /tmp/init.js
 
@@ -39,7 +45,8 @@ services:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d utilisateur_db"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   postgres-sante:
     image: postgres:16-alpine
@@ -58,7 +65,28 @@ services:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d sante_db"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
+
+  postgres-gamification:
+    image: postgres:16-alpine
+    container_name: postgres-gamification
+    environment:
+      POSTGRES_USER: gamification_user
+      POSTGRES_PASSWORD: gamification_password
+      POSTGRES_DB: gamification_db
+    ports:
+      - "15434:5432"
+    volumes:
+      - pg_gamification_data:/var/lib/postgresql/data
+    networks:
+      - mspr502-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d gamification_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   mongodb-logs:
     image: mongo:7
@@ -110,6 +138,10 @@ services:
       POSTGRES_SANTE_PORT: "5432"
       POSTGRES_SANTE_USER: sante_user
       POSTGRES_SANTE_PASSWORD: sante_password
+      POSTGRES_GAMIFICATION_HOST: postgres-gamification
+      POSTGRES_GAMIFICATION_PORT: "5432"
+      POSTGRES_GAMIFICATION_USER: gamification_user
+      POSTGRES_GAMIFICATION_PASSWORD: gamification_password
       MONGODB_LOGS_HOST: mongodb-logs
       MONGODB_LOGS_PORT: "27017"
       MONGODB_RECO_HOST: mongodb-reco
@@ -121,6 +153,8 @@ services:
       postgres-utilisateur:
         condition: service_healthy
       postgres-sante:
+        condition: service_healthy
+      postgres-gamification:
         condition: service_healthy
       mongodb-logs:
         condition: service_healthy
@@ -136,5 +170,6 @@ networks:
 volumes:
   pg_utilisateur_data:
   pg_sante_data:
+  pg_gamification_data:
   mongo_logs_data:
   mongo_reco_data:

@@ -1,5 +1,4 @@
 services:
-
   postgres-utilisateur:
     image: postgres:16-alpine
     container_name: postgres-utilisateur
@@ -18,7 +17,8 @@ services:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d utilisateur_db"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   postgres-sante:
     image: postgres:16-alpine
@@ -38,7 +38,29 @@ services:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d sante_db"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
+
+  postgres-gamification:
+    image: postgres:16-alpine
+    container_name: postgres-gamification
+    environment:
+      POSTGRES_USER: ${POSTGRES_GAMIFICATION_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_GAMIFICATION_PASSWORD}
+      POSTGRES_DB: gamification_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg_gamification_data:/var/lib/postgresql/data
+      - ./init/postgres-gamification:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mspr502-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d gamification_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   mongodb-logs:
     image: mongo:7
@@ -91,6 +113,8 @@ services:
       POSTGRES_UTILISATEUR_PORT: 5432
       POSTGRES_SANTE_HOST: postgres-sante
       POSTGRES_SANTE_PORT: 5432
+      POSTGRES_GAMIFICATION_HOST: postgres-gamification
+      POSTGRES_GAMIFICATION_PORT: 5432
       MONGODB_LOGS_HOST: mongodb-logs
       MONGODB_LOGS_PORT: 27017
       MONGODB_RECO_HOST: mongodb-reco
@@ -99,6 +123,8 @@ services:
       postgres-utilisateur:
         condition: service_healthy
       postgres-sante:
+        condition: service_healthy
+      postgres-gamification:
         condition: service_healthy
       mongodb-logs:
         condition: service_healthy
@@ -114,5 +140,6 @@ networks:
 volumes:
   pg_utilisateur_data:
   pg_sante_data:
+  pg_gamification_data:
   mongo_logs_data:
   mongo_reco_data:

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import auth, utilisateurs, sante, logs, reco, journal
+from api.routers import auth, utilisateurs, sante, logs, reco, journal, gamification
 
 app = FastAPI(
     title="HealthAI Coach API",
@@ -23,6 +23,7 @@ app.include_router(sante.router, prefix="/api")
 app.include_router(journal.router, prefix="/api")
 app.include_router(logs.router, prefix="/api")
 app.include_router(reco.router, prefix="/api")
+app.include_router(gamification.router, prefix="/api")
 
 
 @app.get("/")
