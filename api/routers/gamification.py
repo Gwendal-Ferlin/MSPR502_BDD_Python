@@ -60,7 +60,7 @@ def _ensure_currency_row(db: Session, user_id: UUID) -> dict[str, Any]:
     row = db.execute(
         text(
             """
-            SELECT user_id, coins, total_coins_earned, total_coins_spent
+            SELECT id, user_id, coins, total_coins_earned, total_coins_spent
             FROM gamification_user_currency
             WHERE user_id = :uid
             """
@@ -73,7 +73,7 @@ def _ensure_currency_row(db: Session, user_id: UUID) -> dict[str, Any]:
         text(
             """
             INSERT INTO gamification_user_currency (user_id, coins, total_coins_earned, total_coins_spent, updated_at)
-            VALUES (:uid, 500, 500, 0, now())
+            VALUES (:uid, 0, 0, 0, now())
             """
         ),
         {"uid": str(user_id)},
@@ -81,13 +81,14 @@ def _ensure_currency_row(db: Session, user_id: UUID) -> dict[str, Any]:
     row = db.execute(
         text(
             """
-            SELECT user_id, coins, total_coins_earned, total_coins_spent
+            SELECT id, user_id, coins, total_coins_earned, total_coins_spent
             FROM gamification_user_currency
             WHERE user_id = :uid
             """
         ),
         {"uid": str(user_id)},
     ).fetchone()
+    db.commit()
     return dict(row._mapping)
 
 
@@ -102,7 +103,7 @@ def get_inventory(
     animals_rows = db.execute(
         text(
             """
-            SELECT animal_id, is_visible, active_chroma_id, acquired_at
+            SELECT id, animal_id, is_visible, active_chroma_id, acquired_at
             FROM gamification_user_inventory
             WHERE user_id = :uid
             ORDER BY acquired_at ASC
@@ -135,6 +136,7 @@ def get_inventory(
             acquired_at = acquired_at.replace(tzinfo=timezone.utc)
         animals.append(
             {
+                "id": str(m["id"]),
                 "animal_id": m["animal_id"],
                 "is_visible": m["is_visible"],
                 "active_chroma_id": m["active_chroma_id"],
@@ -145,7 +147,8 @@ def get_inventory(
     return ApiResponse(
         success=True,
         data={
-            "coins": currency["coins"],
+            "id": str(currency["id"]),
+            "coins": int(currency["coins"]),
             "animals": animals,
             "chromas": chromas,
         },
@@ -183,7 +186,7 @@ def buy_animal(
         currency = db.execute(
             text(
                 """
-                SELECT coins, total_coins_earned, total_coins_spent
+                SELECT id, coins, total_coins_earned, total_coins_spent
                 FROM gamification_user_currency
                 WHERE user_id = :uid
                 FOR UPDATE
@@ -196,7 +199,7 @@ def buy_animal(
                 text(
                     """
                     INSERT INTO gamification_user_currency (user_id, coins, total_coins_earned, total_coins_spent, updated_at)
-                    VALUES (:uid, 500, 500, 0, now())
+                    VALUES (:uid, 0, 0, 0, now())
                     """
                 ),
                 {"uid": str(user_id)},
@@ -204,7 +207,7 @@ def buy_animal(
             currency = db.execute(
                 text(
                     """
-                    SELECT coins, total_coins_earned, total_coins_spent
+                    SELECT id, coins, total_coins_earned, total_coins_spent
                     FROM gamification_user_currency
                     WHERE user_id = :uid
                     FOR UPDATE
@@ -287,7 +290,9 @@ def buy_animal(
         ).fetchone()
 
         remaining = db.execute(
-            text("SELECT coins FROM gamification_user_currency WHERE user_id = :uid"),
+            text(
+                "SELECT id, coins FROM gamification_user_currency WHERE user_id = :uid"
+            ),
             {"uid": str(user_id)},
         ).fetchone()
         db.execute(text("COMMIT"))
@@ -296,6 +301,7 @@ def buy_animal(
             success=True,
             message="Animal acheté avec succès",
             data={
+                "id": str(remaining._mapping["id"]),
                 "animal_id": animal_id,
                 "remaining_coins": int(remaining._mapping["coins"]),
                 "transaction_id": str(tx._mapping["id"]),
@@ -347,7 +353,7 @@ def buy_chroma(
         currency = db.execute(
             text(
                 """
-                SELECT coins
+                SELECT id, coins
                 FROM gamification_user_currency
                 WHERE user_id = :uid
                 FOR UPDATE
@@ -360,14 +366,14 @@ def buy_chroma(
                 text(
                     """
                     INSERT INTO gamification_user_currency (user_id, coins, total_coins_earned, total_coins_spent, updated_at)
-                    VALUES (:uid, 500, 500, 0, now())
+                    VALUES (:uid, 0, 0, 0, now())
                     """
                 ),
                 {"uid": str(user_id)},
             )
             currency = db.execute(
                 text(
-                    "SELECT coins FROM gamification_user_currency WHERE user_id = :uid FOR UPDATE"
+                    "SELECT id, coins FROM gamification_user_currency WHERE user_id = :uid FOR UPDATE"
                 ),
                 {"uid": str(user_id)},
             ).fetchone()
@@ -434,7 +440,9 @@ def buy_chroma(
         ).fetchone()
 
         remaining = db.execute(
-            text("SELECT coins FROM gamification_user_currency WHERE user_id = :uid"),
+            text(
+                "SELECT id, coins FROM gamification_user_currency WHERE user_id = :uid"
+            ),
             {"uid": str(user_id)},
         ).fetchone()
         db.execute(text("COMMIT"))
@@ -443,6 +451,7 @@ def buy_chroma(
             success=True,
             message="Couleur achetée",
             data={
+                "id": str(remaining._mapping["id"]),
                 "animal_id": animal_id,
                 "chroma_id": chroma_id,
                 "remaining_coins": int(remaining._mapping["coins"]),
@@ -538,7 +547,7 @@ def add_coins(
         row = db.execute(
             text(
                 """
-                SELECT coins, total_coins_earned, total_coins_spent
+                SELECT id, coins, total_coins_earned, total_coins_spent
                 FROM gamification_user_currency
                 WHERE user_id = :uid
                 FOR UPDATE
@@ -551,7 +560,7 @@ def add_coins(
                 text(
                     """
                     INSERT INTO gamification_user_currency (user_id, coins, total_coins_earned, total_coins_spent, updated_at)
-                    VALUES (:uid, 500, 500, 0, now())
+                    VALUES (:uid, 0, 0, 0, now())
                     """
                 ),
                 {"uid": str(user_id)},
@@ -586,7 +595,9 @@ def add_coins(
         ).fetchone()
 
         coins_row = db.execute(
-            text("SELECT coins FROM gamification_user_currency WHERE user_id = :uid"),
+            text(
+                "SELECT id, coins FROM gamification_user_currency WHERE user_id = :uid"
+            ),
             {"uid": str(user_id)},
         ).fetchone()
 
@@ -594,6 +605,7 @@ def add_coins(
         return ApiResponse(
             success=True,
             data={
+                "id": str(coins_row._mapping["id"]),
                 "coins": int(coins_row._mapping["coins"]),
                 "transaction_id": str(tx._mapping["id"]),
             },
@@ -640,6 +652,7 @@ def get_stats(
     return ApiResponse(
         success=True,
         data={
+            "id": str(currency["id"]),
             "total_animals": int(total_animals),
             "rare_or_better": int(rare_or_better),
             "completion_percentage": completion,

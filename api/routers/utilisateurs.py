@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from api.auth.dependencies import get_current_user, require_roles
 from api.db.postgres_utilisateur import get_session_utilisateur
+from api.db.postgres_gamification import get_session_gamification
 from api.db.mongo_logs import get_mongo_logs
 from api.schemas.auth import CurrentUser
 from api.schemas.utilisateurs import (
@@ -63,6 +64,7 @@ def _appliquer_fin_periode_tous(db: Session) -> None:
 def create_compte(
     body: CompteUtilisateurCreate,
     db: Session = Depends(get_session_utilisateur),
+    db_gamification: Session = Depends(get_session_gamification),
 ):
     email = body.email.strip().lower()
     # 1. Vérifier si l'email existe déjà
@@ -97,7 +99,53 @@ def create_compte(
         text("INSERT INTO vault_correspondance (id_user) VALUES (:id_user)"),
         {"id_user": new_user["id_user"]}
     )
-    db.commit()
+
+    vault_row = db.execute(
+        text("SELECT id_anonyme FROM vault_correspondance WHERE id_user = :id_user"),
+        {"id_user": new_user["id_user"]},
+    ).fetchone()
+    if not vault_row:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Vault non créé pour cet utilisateur",
+        )
+    id_anonyme = str(vault_row._mapping["id_anonyme"])
+
+    # 5. Ligne monnaie gamification (0 pépites à la création du compte)
+    try:
+        db_gamification.execute(
+            text(
+                """
+                INSERT INTO gamification_user_currency (user_id, coins, total_coins_earned, total_coins_spent, updated_at)
+                VALUES (:uid, 0, 0, 0, now())
+                ON CONFLICT (user_id) DO NOTHING
+                """
+            ),
+            {"uid": id_anonyme},
+        )
+        db_gamification.commit()
+    except Exception:
+        db_gamification.rollback()
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Impossible d'initialiser la gamification pour cet utilisateur",
+        )
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        try:
+            db_gamification.execute(
+                text("DELETE FROM gamification_user_currency WHERE user_id = :uid"),
+                {"uid": id_anonyme},
+            )
+            db_gamification.commit()
+        except Exception:
+            db_gamification.rollback()
+        raise
 
     return CompteUtilisateurRead.model_validate(new_user)
 

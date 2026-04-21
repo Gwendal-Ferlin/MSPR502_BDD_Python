@@ -375,6 +375,72 @@ erDiagram
     MATERIEL }o--o{ UTILISATEUR_MATERIEL : "associe"
 ```
 
+#### PostgreSQL — `gamification_db`
+
+Base dédiée à la gamification (zoo, chromas, monnaie). Le champ **`user_id`** est un UUID aligné sur l’**`id_anonyme`** du vault (pas de FK inter-bases vers `utilisateur_db`).
+
+```mermaid
+erDiagram
+    GAMIFICATION_ANIMALS_CONFIG ||--o{ GAMIFICATION_CHROMAS_CONFIG : "catalogue"
+    GAMIFICATION_USER_INVENTORY ||--o{ GAMIFICATION_USER_CHROMAS : "débloque"
+
+    GAMIFICATION_USER_INVENTORY {
+        uuid id PK
+        uuid user_id
+        string animal_id
+        boolean is_visible
+        string active_chroma_id
+        datetime acquired_at
+        datetime updated_at
+    }
+    GAMIFICATION_USER_CHROMAS {
+        uuid id PK
+        uuid user_id
+        string animal_id
+        string chroma_id
+        datetime purchased_at
+    }
+    GAMIFICATION_USER_CURRENCY {
+        uuid id PK
+        uuid user_id
+        bigint coins
+        bigint total_coins_earned
+        bigint total_coins_spent
+        datetime updated_at
+    }
+    GAMIFICATION_TRANSACTIONS {
+        uuid id PK
+        uuid user_id
+        string transaction_type
+        bigint amount
+        string animal_id
+        string chroma_id
+        datetime created_at
+        jsonb metadata
+    }
+    GAMIFICATION_ANIMALS_CONFIG {
+        uuid id PK
+        string animal_id UK
+        string name
+        string emoji
+        bigint price
+        string rarity
+        string description
+        boolean is_available
+        datetime created_at
+    }
+    GAMIFICATION_CHROMAS_CONFIG {
+        uuid id PK
+        string animal_id
+        string chroma_id
+        string name
+        bigint price
+        int row_y
+        boolean is_available
+        datetime created_at
+    }
+```
+
 #### MongoDB — `logs_config`
 
 ```mermaid
@@ -427,6 +493,7 @@ erDiagram
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | **PostgreSQL** `utilisateur_db` | `compte_utilisateur`, `vault_correspondance` (lien id_user ↔ id_anonyme)                                                                      |
 | **PostgreSQL** `sante_db`       | Profil santé, objectifs, suivi biométrique, journal alimentaire, séances, référentiels (restrictions, exercices, matériel), tables de liaison |
+| **PostgreSQL** `gamification_db` | Inventaire animaux/chromas par utilisateur, monnaie (pépites), transactions, catalogues animaux et chromas                                   |
 | **MongoDB** `logs_config`       | Événements / logs (collection `evenements`) et config                                                                                         |
 | **MongoDB** `reco`              | Recommandations (collection `recommendations`), repas/recettes par utilisateur (collection `repas`)                                           |
 
@@ -563,6 +630,8 @@ Les actions utilisateur utilisent l’identifiant du token (champ `id_anonyme`, 
 | GET     | `/api/gamification/animals/catalog`    | Public ou Oui               | Catalogue des animaux + chromas (si authentifié : indique `owned`, chromas possédés et chroma actif). |
 
 Notes :
+- **Pépites** : solde initial **0** à la création du compte ; si une ligne monnaie n’existait pas encore, l’API la crée aussi à **0** (plus de valeur par défaut à 500 côté serveur).
+- **Réponses** : les payloads incluent l’**`id`** de la ligne `gamification_user_currency` là où c’est pertinent (inventaire, stats, achats, admin `coins/add`), et chaque animal possédé dans l’inventaire inclut l’**`id`** de ligne d’inventaire.
 - **Prix** : pour les achats, l’API valide le prix côté serveur via les tables de config (pour éviter la triche côté client).
 - **Transactions** : les achats et gains créent une entrée dans `gamification_transactions`.
 
