@@ -146,6 +146,19 @@ docker exec postgres-sante psql -U sante_user -d sante_db -f /tmp/05_migration_p
 
 Pour des bases déjà créées en local (volumes existants) sans init auto, les mêmes commandes Postgres/Mongo ci-dessus s’appliquent.
 
+### Données et persistance
+
+Les données des bases **ne sont pas** dans l’image Docker : elles sont stockées dans des **volumes nommés** déclarés dans le Compose (ex. données Postgres sous `/var/lib/postgresql/data`, MongoDB sous `/data/db`). Tant que ces volumes existent, **comptes, repas, logs, gamification**, etc. restent disponibles après un redémarrage.
+
+| Action | Effet sur les conteneurs | Effet sur les données (volumes) |
+| ------ | ------------------------ | -------------------------------- |
+| `docker compose restart` ou arrêt / redémarrage de la machine | Les conteneurs redémarrent ; configuration inchangée. | **Conservées** : les bases reprennent là où elles s’étaient arrêtées. |
+| `docker compose down` | Conteneurs et réseau du projet supprimés. | **Conservées** par défaut : un `docker compose up -d` recrée les conteneurs **en réattachant** les mêmes volumes. |
+| `docker compose down -v` | Idem + suppression explicite des **volumes** du projet. | **Perdues** (toutes les BDD du stack). Au prochain `up`, les dossiers `init/` seront rejoués **uniquement** sur des volumes **neufs** (schéma + seed comme au premier install). |
+| Rebuild `docker compose up -d --build` | Nouvelle image API si le code a changé. | **Conservées** : seul le code livré dans l’image change, pas le contenu des bases. |
+
+**À retenir** : un « plantage » ou un redémarrage **ne vide pas** les bases tant que vous n’utilisez pas `-v` ni une suppression manuelle des volumes Docker. Pour **réinitialiser complètement** l’environnement local (repartir de zéro), il faut explicitement `down -v` ou supprimer les volumes concernés dans Docker, en acceptant la perte de données.
+
 ---
 
 ## Schéma BDD
@@ -613,6 +626,14 @@ Création d'entrées du journal alimentaire (liste via **GET** `/api/sante/journ
 
 ---
 
+### IA (programme d’exercices — Hugging Face distant)
+
+| Méthode | Chemin                         | Auth | Description |
+| ------- | ------------------------------ | ---- | ----------- |
+| POST    | `/api/ia/recommandations`      | Oui  | Appelle le script `ia-reco/Ia_recom_mistral_distant.py` (Router Hugging Face). **Body** : `niveau`, `objectif`, `date_debut`, `date_fin`, `valeur_cible`, `unite`, `materiels`, et `biometrie` **ou** `suivi_biometrique` avec `poids_kg` (voir script pour les valeurs autorisées). Nécessite **`HF_API_TOKEN`** dans l’environnement de l’API. |
+
+---
+
 ### Gamification
 
 Ces endpoints gèrent l’inventaire (animaux + chromas), la monnaie (pépites) et le catalogue.  
@@ -647,6 +668,7 @@ Notes :
 - **/api/journal** : création d'entrées du journal alimentaire + total calories jour (token).
 - **/api/logs** : evenements (token + id_anonyme selon rôle), config (public).
 - **/api/reco** : recommendations et repas (liste + détail + création), token + id_anonyme selon rôle.
+- **/api/ia** : génération de programme d’exercices via modèle distant HF (token + `HF_API_TOKEN`).
 - **/api/gamification** : inventaire, achats animaux/chromas, stats, catalogue (token selon route).
 
 Documentation interactive (Swagger) : **GET** `/docs`.
