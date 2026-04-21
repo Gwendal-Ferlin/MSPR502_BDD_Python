@@ -4,13 +4,16 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pymongo.database import Database
 from bson import ObjectId
+from sqlalchemy.orm import Session
 
 from api.auth.dependencies import get_current_user
 from api.db.mongo_reco import get_mongo_reco
 from api.db.mongo_logs import get_mongo_logs
+from api.db.postgres_gamification import get_session_gamification
 from api.schemas.auth import CurrentUser
 from api.schemas.reco import RecommendationRead, RepasCreate, RepasRead
 from api.services.log_admin import log_admin_consultation_tiers
+from api.services.gamification_rewards import COINS_PER_REPAS_CREATED, reward_coins_repas_created
 
 router = APIRouter(prefix="/reco", tags=["Recommandations"])
 
@@ -105,8 +108,10 @@ def create_repas(
     body: RepasCreate,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Database = Depends(get_mongo_reco),
+    db_gamification: Session = Depends(get_session_gamification),
 ):
-    """Crée un repas (recette) pour l'utilisateur connecté. Lié à son id_anonyme."""
+    """Crée un repas (recette) pour l'utilisateur connecté. Lié à son id_anonyme.
+    Attribue des pépites (gamification) : voir `coins_earned` dans la réponse."""
     coll = db["repas"]
     now = datetime.now(timezone.utc)
     doc = {
@@ -120,8 +125,29 @@ def create_repas(
         "created_at": now,
     }
     result = coll.insert_one(doc)
+    repas_oid = str(result.inserted_id)
+    try:
+        reward = reward_coins_repas_created(
+            db_gamification,
+            current_user.id_anonyme,
+            repas_id=repas_oid,
+            amount=COINS_PER_REPAS_CREATED,
+        )
+    except Exception:
+        coll.delete_one({"_id": result.inserted_id})
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Repas créé puis annulé : impossible d'attribuer les pépites (gamification indisponible).",
+        )
+
     doc["_id"] = result.inserted_id
-    doc["id"] = str(result.inserted_id)
+    doc["id"] = repas_oid
     doc["id_anonyme"] = str(doc["id_anonyme"])
     doc["created_at"] = now
-    return _repas_doc_to_read(doc)
+    base = _repas_doc_to_read(doc)
+    return RepasRead(
+        **base.model_dump(),
+        coins_earned=reward["coins_earned"],
+        total_coins=reward["total_coins"],
+        gamification_transaction_id=reward["transaction_id"],
+    )

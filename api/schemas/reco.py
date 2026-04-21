@@ -32,3 +32,7 @@ class RepasRead(BaseModel):
     glucides: float | None = None
     proteines: float | None = None
     created_at: datetime | None = None
+    # Renseignés sur POST /repas si récompense gamification appliquée
+    coins_earned: int | None = None
+    total_coins: int | None = None
+    gamification_transaction_id: str | None = None

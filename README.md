@@ -50,14 +50,14 @@ flowchart LR
 
 #### Tableau (local vs hôte)
 
-| Service              | Port conteneur | Port hôte (local) | Exemple d’accès depuis l’hôte   |
-| -------------------- | -------------: | ----------------: | ------------------------------- |
-| API                  |           8000 |              8000 | `http://localhost:8000`         |
-| Postgres utilisateur |           5432 |              5432 | `psql -h localhost -p 5432 ...` |
-| Postgres santé       |           5432 |              5433 | `psql -h localhost -p 5433 ...` |
-| Postgres gamification|           5432 |              5434 | `psql -h localhost -p 5434 ...` |
-| MongoDB logs         |          27017 |             27017 | `mongosh --port 27017`          |
-| MongoDB reco         |          27017 |             27018 | `mongosh --port 27018`          |
+| Service               | Port conteneur | Port hôte (local) | Exemple d’accès depuis l’hôte   |
+| --------------------- | -------------: | ----------------: | ------------------------------- |
+| API                   |           8000 |              8000 | `http://localhost:8000`         |
+| Postgres utilisateur  |           5432 |              5432 | `psql -h localhost -p 5432 ...` |
+| Postgres santé        |           5432 |              5433 | `psql -h localhost -p 5433 ...` |
+| Postgres gamification |           5432 |              5434 | `psql -h localhost -p 5434 ...` |
+| MongoDB logs          |          27017 |             27017 | `mongosh --port 27017`          |
+| MongoDB reco          |          27017 |             27018 | `mongosh --port 27018`          |
 
 ### Arrêt
 
@@ -489,13 +489,13 @@ erDiagram
 
 ### Bases et rôles
 
-| Base / Store                    | Rôle                                                                                                                                          |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| **PostgreSQL** `utilisateur_db` | `compte_utilisateur`, `vault_correspondance` (lien id_user ↔ id_anonyme)                                                                      |
-| **PostgreSQL** `sante_db`       | Profil santé, objectifs, suivi biométrique, journal alimentaire, séances, référentiels (restrictions, exercices, matériel), tables de liaison |
-| **PostgreSQL** `gamification_db` | Inventaire animaux/chromas par utilisateur, monnaie (pépites), transactions, catalogues animaux et chromas                                   |
-| **MongoDB** `logs_config`       | Événements / logs (collection `evenements`) et config                                                                                         |
-| **MongoDB** `reco`              | Recommandations (collection `recommendations`), repas/recettes par utilisateur (collection `repas`)                                           |
+| Base / Store                     | Rôle                                                                                                                                          |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **PostgreSQL** `utilisateur_db`  | `compte_utilisateur`, `vault_correspondance` (lien id_user ↔ id_anonyme)                                                                      |
+| **PostgreSQL** `sante_db`        | Profil santé, objectifs, suivi biométrique, journal alimentaire, séances, référentiels (restrictions, exercices, matériel), tables de liaison |
+| **PostgreSQL** `gamification_db` | Inventaire animaux/chromas par utilisateur, monnaie (pépites), transactions, catalogues animaux et chromas                                    |
+| **MongoDB** `logs_config`        | Événements / logs (collection `evenements`) et config                                                                                         |
+| **MongoDB** `reco`               | Recommandations (collection `recommendations`), repas/recettes par utilisateur (collection `repas`)                                           |
 
 Le **vault** fait le lien RGPD entre l’identifiant nominatif (`id_user`) et l’identifiant anonyme (`id_anonyme`) utilisé partout en base Santé et dans les logs.
 
@@ -604,12 +604,12 @@ Création d'entrées du journal alimentaire (liste via **GET** `/api/sante/journ
 
 ### Recommandations
 
-| Méthode | Chemin                       | Auth | Logué                                             | Description                                                                                                                                                                                                                                                                                                                                                     |
-| ------- | ---------------------------- | ---- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET     | `/api/reco/recommendations`  | Oui  | **Oui** si admin filtre par un `id_anonyme` tiers | Liste les recommandations. **Client** : uniquement les siennes. **Admin/Super-Admin** : tous, avec filtre optionnel. **Query** : `id_anonyme` (optionnel), `type` (optionnel, ex. "nutrition", "activite"). Limite 50, tri par `created_at` décroissant.                                                                                                        |
-| GET     | `/api/reco/repas`            | Oui  | **Oui** si admin filtre par un `id_anonyme` tiers | Liste les repas (recettes) de l'utilisateur. **Client** : les siens. **Admin/Super-Admin** : tous, avec **Query** `id_anonyme` (optionnel). Limite 100, tri par `created_at` décroissant.                                                                                                                                                                       |
-| GET     | `/api/reco/repas/{repas_id}` | Oui  | Non                                               | Récupère un repas par son id (ObjectId MongoDB). Le repas doit appartenir à l'utilisateur connecté ; Admin/Super-Admin peuvent accéder à tout. 403 si accès interdit, 404 si inexistant.                                                                                                                                                                        |
-| POST    | `/api/reco/repas`            | Oui  | Non                                               | Crée un repas (recette) pour l'utilisateur connecté, lié à son `id_anonyme`. **Body** : `nom_repas`, `aliments` (objet clé-valeur : nom aliment → dosage avec unité, ex. `{"Poulet": "150 g", "Riz": "200 g"}`), `total_calories`, `lipides`, `glucides`, `proteines`. **Réponse** : 201 + RepasRead (id, id_anonyme, nom_repas, aliments, totaux, created_at). |
+| Méthode | Chemin                       | Auth | Logué                                             | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------- | ---------------------------- | ---- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET     | `/api/reco/recommendations`  | Oui  | **Oui** si admin filtre par un `id_anonyme` tiers | Liste les recommandations. **Client** : uniquement les siennes. **Admin/Super-Admin** : tous, avec filtre optionnel. **Query** : `id_anonyme` (optionnel), `type` (optionnel, ex. "nutrition", "activite"). Limite 50, tri par `created_at` décroissant.                                                                                                                                                                                                                  |
+| GET     | `/api/reco/repas`            | Oui  | **Oui** si admin filtre par un `id_anonyme` tiers | Liste les repas (recettes) de l'utilisateur. **Client** : les siens. **Admin/Super-Admin** : tous, avec **Query** `id_anonyme` (optionnel). Limite 100, tri par `created_at` décroissant.                                                                                                                                                                                                                                                                                 |
+| GET     | `/api/reco/repas/{repas_id}` | Oui  | Non                                               | Récupère un repas par son id (ObjectId MongoDB). Le repas doit appartenir à l'utilisateur connecté ; Admin/Super-Admin peuvent accéder à tout. 403 si accès interdit, 404 si inexistant.                                                                                                                                                                                                                                                                                  |
+| POST    | `/api/reco/repas`            | Oui  | Non                                               | Crée un repas (recette) pour l'utilisateur connecté, lié à son `id_anonyme`. **Body** : `nom_repas`, `aliments` (objet clé-valeur : nom aliment → dosage avec unité, ex. `{"Poulet": "150 g", "Riz": "200 g"}`), `total_calories`, `lipides`, `glucides`, `proteines`. **Réponse** : 201 + RepasRead ; crédite **100 pépites** en base gamification (`coins_earned`, `total_coins`, `gamification_transaction_id`). Si la gamification échoue, le repas est annulé (503). |
 
 ---
 
@@ -618,18 +618,19 @@ Création d'entrées du journal alimentaire (liste via **GET** `/api/sante/journ
 Ces endpoints gèrent l’inventaire (animaux + chromas), la monnaie (pépites) et le catalogue.  
 Les actions utilisateur utilisent l’identifiant du token (champ `id_anonyme`, UUID) comme `user_id` en base gamification.
 
-| Méthode | Chemin                                 | Auth                        | Description |
-| ------- | -------------------------------------- | --------------------------- | ----------- |
-| GET     | `/api/gamification/inventory`          | Oui                         | Inventaire complet de l’utilisateur : coins, animaux possédés, chromas possédés. |
-| POST    | `/api/gamification/animals/buy`        | Oui                         | Achat d’un animal (vérifie la propriété et les fonds). |
-| POST    | `/api/gamification/chromas/buy`        | Oui                         | Achat d’un chroma pour un animal possédé (vérifie propriété + fonds). |
-| PUT     | `/api/gamification/chromas/set-active` | Oui                         | Définit le chroma actif d’un animal (chroma doit être possédé). |
-| PUT     | `/api/gamification/animals/toggle-visibility` | Oui                   | Affiche/cache un animal du zoo. |
-| POST    | `/api/gamification/coins/add`          | Oui (**Admin/Super-Admin**) | Ajoute des pépites à un utilisateur (récompenses sport/nutrition). |
-| GET     | `/api/gamification/stats`              | Oui                         | Statistiques globales (collection, rareté, complétion, coins). |
-| GET     | `/api/gamification/animals/catalog`    | Public ou Oui               | Catalogue des animaux + chromas (si authentifié : indique `owned`, chromas possédés et chroma actif). |
+| Méthode | Chemin                                        | Auth                        | Description                                                                                           |
+| ------- | --------------------------------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------- |
+| GET     | `/api/gamification/inventory`                 | Oui                         | Inventaire complet de l’utilisateur : coins, animaux possédés, chromas possédés.                      |
+| POST    | `/api/gamification/animals/buy`               | Oui                         | Achat d’un animal (vérifie la propriété et les fonds).                                                |
+| POST    | `/api/gamification/chromas/buy`               | Oui                         | Achat d’un chroma pour un animal possédé (vérifie propriété + fonds).                                 |
+| PUT     | `/api/gamification/chromas/set-active`        | Oui                         | Définit le chroma actif d’un animal (chroma doit être possédé).                                       |
+| PUT     | `/api/gamification/animals/toggle-visibility` | Oui                         | Affiche/cache un animal du zoo.                                                                       |
+| POST    | `/api/gamification/coins/add`                 | Oui (**Admin/Super-Admin**) | Ajoute des pépites à un utilisateur (récompenses sport/nutrition).                                    |
+| GET     | `/api/gamification/stats`                     | Oui                         | Statistiques globales (collection, rareté, complétion, coins).                                        |
+| GET     | `/api/gamification/animals/catalog`           | Public ou Oui               | Catalogue des animaux + chromas (si authentifié : indique `owned`, chromas possédés et chroma actif). |
 
 Notes :
+
 - **Pépites** : solde initial **0** à la création du compte ; si une ligne monnaie n’existait pas encore, l’API la crée aussi à **0** (plus de valeur par défaut à 500 côté serveur).
 - **Réponses** : les payloads incluent l’**`id`** de la ligne `gamification_user_currency` là où c’est pertinent (inventaire, stats, achats, admin `coins/add`), et chaque animal possédé dans l’inventaire inclut l’**`id`** de ligne d’inventaire.
 - **Prix** : pour les achats, l’API valide le prix côté serveur via les tables de config (pour éviter la triche côté client).
@@ -663,3 +664,60 @@ Quand une route est **Logué = Oui** et qu'un Admin/Super-Admin consulte des don
 La consultation par un admin de **ses propres** données (même `id_user` ou `id_anonyme`) n'est pas loguée.
 
 Quand un Admin/Super-Admin **supprime** le compte d'un tiers (DELETE /api/utilisateurs/{id_user} avec id_user ≠ soi-même), un événement est enregistré avec **action** : `suppression_utilisateur_tiers` et **details_techniques** : `endpoint`, `role_acteur`, `id_user_acteur`, `id_user_cible`.
+
+---
+
+## Dépannage
+
+Symptômes et erreurs fréquentes en local (Docker Compose) ou après déploiement. Les messages exacts peuvent varier selon la version de Docker / l’OS.
+
+### Docker / Compose
+
+| Symptôme                                                                                      | Cause probable                                                                                                           | Piste de résolution                                                                                                                                                                                                                                       |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Bind for 0.0.0.0:8000 failed: port is already allocated` (ou 5432, 5433, 5434, 27017, 27018) | Un autre programme ou un autre conteneur utilise déjà ce **port hôte**.                                                  | Arrêter l’autre service, ou modifier le mapping dans `docker-compose.yml` (ex. `"18000:8000"` pour l’API) et adapter les URLs / la doc. Sous Windows : `netstat -ano` puis repérer le PID qui écoute sur le port voulu ; terminer ce processus si besoin. |
+| `dependency failed to start: container postgres-… is unhealthy`                               | Postgres (ou Mongo) met du temps à redémarrer (recovery disque), ou le healthcheck est trop strict au premier démarrage. | Attendre et relancer `docker compose up -d` ; vérifier `docker logs <nom-conteneur>`. Les healthchecks ont été assouplis (`retries`, `start_period`) pour ce cas.                                                                                         |
+| `Cannot connect to the Docker daemon`                                                         | Docker Desktop arrêté ou service Docker inactif.                                                                         | Démarrer Docker Desktop (Windows) ou le service `docker`.                                                                                                                                                                                                 |
+| Avertissement `Found orphan containers`                                                       | Anciens conteneurs d’un ancien `docker-compose.yml`.                                                                     | `docker compose up -d --remove-orphans` pour les nettoyer.                                                                                                                                                                                                |
+| L’API ne reflète pas le dernier code Python                                                   | Image Docker **non reconstruite** après modification des fichiers.                                                       | `docker compose up -d --build api` (ou `--build` sur tout le projet).                                                                                                                                                                                     |
+
+### Variables d’environnement et secrets
+
+| Symptôme                                                          | Cause probable                                                                                     | Piste de résolution                                                                                                              |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Conteneur Postgres qui redémarre en boucle ou erreur au démarrage | `POSTGRES_*_PASSWORD` vide ou absent alors que l’image Postgres l’exige.                           | Renseigner tous les mots de passe dans `.env` (copie depuis `.env.example`). Ne pas commiter `.env`.                             |
+| Erreur 401 / `Token invalide ou expiré`                           | JWT expiré, secret différent entre environnements, ou header `Authorization` manquant / mal formé. | Se reconnecter via `POST /api/auth/login` ; vérifier `JWT_SECRET` cohérent dans `.env` avec celui utilisé au démarrage de l’API. |
+
+### Bases de données et données
+
+| Symptôme                                                                                  | Cause probable                                                                                                             | Piste de résolution                                                                                                                                                                                                                         |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tables vides ou schéma absent après un premier `up`                                       | Volume Postgres/Mongo **déjà existant** : les scripts `init/` ne sont exécutés **qu’au tout premier** démarrage du volume. | Soit supprimer le volume nommé (données perdues) : `docker compose down -v` puis `up`, soit appliquer les scripts SQL/JS manuellement comme indiqué dans la section **Initialisation des bases** ci-dessus (cas serveur sans montage auto). |
+| Connexion refusée à `localhost:5432` depuis la machine hôte alors que le conteneur tourne | Mauvais port (ex. santé sur **5433**, gamification sur **5434**).                                                          | Voir la section **Schéma des ports exposés** ; utiliser le bon `-p` pour `psql` / client.                                                                                                                                                   |
+| Erreur lors d’une route qui touche Mongo + Postgres gamification (ex. création de repas)  | Un des deux services indisponible ou mauvaise config réseau / URL.                                                         | `docker compose ps` ; logs `api`, `mongodb-reco`, `postgres-gamification`.                                                                                                                                                                  |
+
+### Déploiement sur serveur
+
+Problèmes typiques quand l’application tourne sur une **machine distante** (VPS, bare-metal, VM, NAS, cloud) plutôt que sur le poste de développement. Pour les principes (chemins, secrets, build, alternatives au `docker-compose.yml` principal), voir aussi **`DEPLOIEMENT.md`**.
+
+| Symptôme                                                                | Cause probable                                                                                                                                                           | Piste de résolution                                                                                                                                                                        |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Permission denied` ou montage `init/` introuvable                      | Chemins **relatifs** (`./init/...`) invalides si le répertoire courant n’est pas la racine du projet, ou permissions du système de fichiers (NFS, stockage réseau, ACL). | Lancer Compose depuis la **racine du dépôt** ; sinon remplacer les chemins par des chemins **absolus** sur le serveur. Vérifier droits lecture sur les scripts d’init.                     |
+| Variables d’environnement ignorées                                      | Le fichier `.env` n’est pas chargé (outil graphique, répertoire de travail différent, secrets injectés ailleurs).                                                        | Définir les variables dans l’interface d’hébergement ou dans la section `environment` du Compose (sans committer les secrets en clair) ; aligner `JWT_SECRET` et mots de passe avec l’API. |
+| Ports exposés différents du README (8000, 5432, etc.)                   | Fichier Compose **adapté** au serveur (autre mapping), ou **conflit** avec des services déjà présents sur l’hôte.                                                        | Lire les `ports:` du YAML réellement déployé ; adapter URL, firewall et documentation interne.                                                                                             |
+| API injoignable depuis l’extérieur alors que `docker compose ps` est OK | Pare-feu (ufw, security groups cloud, règles NAS), ou écoute uniquement sur `127.0.0.1`.                                                                                 | Ouvrir le port applicatif ; placer un **reverse proxy** (nginx, Traefik, Caddy) si HTTPS / nom de domaine.                                                                                 |
+| Build de l’image `api` impossible sur le serveur                        | Pas d’accès Internet pour tirer les images de base, ou politique interdisant le build.                                                                                   | Builder l’image sur une CI ou une machine autorisée, pousser vers un **registry**, puis utiliser `image:` à la place de `build:` dans le Compose.                                          |
+| Schémas BDD vides malgré un `up` réussi                                 | Pas de montage des dossiers `init/` (Compose « minimal ») ou volumes déjà initialisés sans scripts.                                                                      | Exécuter les scripts SQL/JS **manuellement** comme dans la section d’initialisation ; consulter les commentaires d’un éventuel fichier Compose **alternatif** du dépôt si vous l’utilisez. |
+
+### Git
+
+| Symptôme                                  | Cause probable                                               | Piste de résolution                                                                        |
+| ----------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `! [rejected] main -> main (fetch first)` | Le dépôt distant a des commits que vous n’avez pas en local. | `git pull --rebase origin main` puis `git push` (résoudre les conflits si besoin).         |
+| `You are not currently on a branch`       | Rebase ou merge en cours, HEAD détachée.                     | `git status` ; terminer avec `git rebase --continue` ou `git rebase --abort` selon le cas. |
+
+### Vérifications rapides
+
+- **État des conteneurs** : `docker compose ps` (tous **healthy** ou **running** pour l’API).
+- **API vivante** : `GET http://localhost:8000/health` → `{"status":"ok"}`.
+- **Logs** : `docker logs api` ou `docker logs postgres-sante` (dernières lignes en cas d’erreur).
