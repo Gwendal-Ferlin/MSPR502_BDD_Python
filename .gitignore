@@ -1,1 +1,4 @@
 .env
+backups/
+rclone/rclone/rclone.conf
+rclone/rclone.conf

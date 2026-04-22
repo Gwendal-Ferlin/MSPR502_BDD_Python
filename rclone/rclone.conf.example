@@ -1,0 +1,18 @@
+# Pas besoin de créer ce fichier à la main.
+#
+# 1) Depuis la racine du projet, lance UNE FOIS (le -p est OBLIGATOIRE pour l’OAuth navigateur) :
+#
+#    docker run -it --rm -p 53682:53682 -v "${PWD}/rclone:/config" rclone/rclone config
+#
+#    Quand rclone affiche un lien http://127.0.0.1:53682/auth?... ouvre-le dans ton navigateur
+#    SUR TA MACHINE : le port est relayé vers le conteneur.
+#
+#    Si tu as oublié -p : Ctrl+C, relance avec la commande ci-dessus.
+#
+# 2) Choisis "Google Drive", donne un nom au remote (ex. gdrive), suis l’auth navigateur.
+#
+# 3) Le fichier apparaît sur ton PC sous : rclone/rclone/rclone.conf
+#
+# 4) Dans .env du projet :
+#    RCLONE_REMOTE=gdrive
+#    RCLONE_PATH=MSPR502/backups

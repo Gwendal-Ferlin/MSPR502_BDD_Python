@@ -689,6 +689,104 @@ Quand un Admin/Super-Admin **supprime** le compte d'un tiers (DELETE /api/utilis
 
 ---
 
+## Sauvegardes (backup)
+
+Le service **`backup`** produit un export des **cinq bases** du `docker-compose.yml` :
+
+| Source | Fichier généré (dans `backups/<horodatage>/`) |
+| ------ | --------------------------------------------- |
+| Postgres `utilisateur_db` | `postgres-utilisateur_utilisateur_db.pgdump` |
+| Postgres `sante_db` | `postgres-sante_sante_db.pgdump` |
+| Postgres `gamification_db` | `postgres-gamification_gamification_db.pgdump` |
+| MongoDB `logs_config` | `mongodb-logs_logs_config.archive.gz` |
+| MongoDB `reco` | `mongodb-reco_reco.archive.gz` |
+
+Les dumps Postgres sont au **format custom** (`pg_dump -F c`) : ce sont des fichiers **binaires** (pas du SQL lisible tel quel).
+
+### Prérequis
+
+- Fichier **`.env`** à la racine avec les mots de passe Postgres (`POSTGRES_*_USER` / `POSTGRES_*_PASSWORD`), comme pour l’API.
+- Dossier local **`backups/`** : créé automatiquement ; il est listé dans **`.gitignore`** (ne pas versionner les exports).
+
+### Lancer une sauvegarde
+
+Le service `backup` **ne démarre pas tout seul** avec `docker compose up` : il s’exécute **à la demande**.
+
+```bash
+docker compose build backup
+docker compose run --rm backup
+```
+
+- Les fichiers sont écrits sous **`./backups/<timestamp-UTC>/`** (ex. `2026-04-22T14-00-13Z`).
+- Un document est inséré dans MongoDB **`mongodb-logs`**, base **`logs_config`**, collection **`backup_runs`** (`status`, `backupTimestamp`, `artifacts`, et si configuré : `uploadStatus`, `uploadDest`).
+
+### Automatisation (planification)
+
+Tu peux lancer la même commande **à intervalle régulier** depuis l’hôte, par exemple :
+
+- **Windows** : **Planificateur de tâches** — créer une tâche qui exécute périodiquement un script ou une ligne de commande dans le répertoire du projet (adapter le chemin) :
+
+  ```text
+  docker compose run --rm backup
+  ```
+
+  (Option : démarrer d’abord la pile si besoin : `docker compose up -d`, puis la backup.)
+
+- **Linux / macOS** : **`cron`** (ou **systemd timers**) — exemple de ligne crontab pour une exécution tous les jours à 3 h du matin (utilisateur qui a accès à Docker, répertoire = racine du dépôt) :
+
+  ```cron
+  0 3 * * * cd /chemin/vers/502 && docker compose run --rm backup >> /var/log/mspr502-backup.log 2>&1
+  ```
+
+**Condition** : au moment de l’exécution, les conteneurs **Postgres et MongoDB** doivent être joignables sur le réseau Compose (en pratique : `docker compose up -d` déjà lancé sur la machine, ou une tâche qui enchaîne `up -d` puis `run --rm backup`).
+
+### Commandes utilitaires (sans relancer tout le script de backup)
+
+L’entrée du conteneur accepte une **commande** à la place du backup complet (ex. `pg_restore`, `pg_dump`).
+
+Chemins **dans** le conteneur : `/backups/<timestamp>/...` (monté depuis `./backups` sur l’hôte).
+
+Exemple pour lister le contenu d’un dump :
+
+```bash
+docker compose run --rm --no-deps backup pg_restore -l /backups/<timestamp>/postgres-gamification_gamification_db.pgdump
+```
+
+Pour extraire les **données** d’une table précise en SQL (bloc `COPY` lisible) :
+
+```bash
+docker compose run --rm --no-deps backup pg_restore -a -t public.ma_table -f /backups/<timestamp>/extrait.sql /backups/<timestamp>/postgres-gamification_gamification_db.pgdump
+```
+
+### Upload optionnel vers Google Drive (rclone)
+
+1. **Configurer rclone une fois** (OAuth : le port **53682** doit être exposé depuis le conteneur vers ta machine) :
+
+   ```bash
+   docker run -it --rm -p 53682:53682 -v "${PWD}/rclone:/config" rclone/rclone config
+   ```
+
+   Choisir **Google Drive** (`drive`), nommer le remote (ex. **`gdrive`**), laisser **`client_id` / `client_secret` vides** sauf si tu as une app Google Cloud dédiée. Répondre **`n`** à « Edit advanced config? » pour éviter la longue liste d’options. Ouvrir dans le navigateur le lien `http://127.0.0.1:53682/...` affiché par rclone.
+
+   Le fichier de configuration est créé localement sous **`rclone/rclone/rclone.conf`** (ne pas le commiter ; voir `.gitignore`).
+
+2. Dans **`.env`** :
+
+   ```env
+   RCLONE_REMOTE=gdrive
+   RCLONE_PATH=MSPR502/backups
+   ```
+
+   (`gdrive` doit être **exactement** le nom du remote défini dans `rclone config`.)
+
+3. Relancer la sauvegarde : après les dumps, le script exécute `rclone copy` vers  
+   **`{RCLONE_REMOTE}:{RCLONE_PATH}/<timestamp>/`** sur ton Drive.  
+   Si l’upload est demandé et échoue, le conteneur se termine avec un **code de sortie non nul** (les fichiers locaux restent dans `./backups/`).
+
+Plus de détails : commentaires dans **`rclone/rclone.conf.example`** et **`.env.example`**.
+
+---
+
 ## Dépannage
 
 Symptômes et erreurs fréquentes en local (Docker Compose) ou après déploiement. Les messages exacts peuvent varier selon la version de Docker / l’OS.

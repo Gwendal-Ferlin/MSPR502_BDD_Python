@@ -133,6 +133,44 @@ services:
     networks:
       - mspr502-network
 
+  backup:
+    build:
+      context: ./backup
+      dockerfile: Dockerfile
+    container_name: backup
+    env_file:
+      - .env
+    environment:
+      POSTGRES_UTILISATEUR_HOST: postgres-utilisateur
+      POSTGRES_UTILISATEUR_PORT: 5432
+      POSTGRES_SANTE_HOST: postgres-sante
+      POSTGRES_SANTE_PORT: 5432
+      POSTGRES_GAMIFICATION_HOST: postgres-gamification
+      POSTGRES_GAMIFICATION_PORT: 5432
+      MONGODB_LOGS_HOST: mongodb-logs
+      MONGODB_LOGS_PORT: 27017
+      MONGODB_RECO_HOST: mongodb-reco
+      MONGODB_RECO_PORT: 27017
+      BACKUP_OUT_DIR: /backups
+      RCLONE_REMOTE: ${RCLONE_REMOTE:-}
+      RCLONE_PATH: ${RCLONE_PATH:-MSPR502/backups}
+    volumes:
+      - ./backups:/backups
+      - ./rclone:/config:ro
+    depends_on:
+      postgres-utilisateur:
+        condition: service_healthy
+      postgres-sante:
+        condition: service_healthy
+      postgres-gamification:
+        condition: service_healthy
+      mongodb-logs:
+        condition: service_healthy
+      mongodb-reco:
+        condition: service_healthy
+    networks:
+      - mspr502-network
+
 networks:
   mspr502-network:
     driver: bridge
