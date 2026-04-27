@@ -12,7 +12,8 @@ Sur **TrueNAS Scale 24.10 (Electric Eel)** ou plus récent, l’interface suppor
    Copier le dépôt (ou les fichiers nécessaires) sur un dataset accessible, par ex. `/mnt/pool/apps/mspr502/`, pour que les chemins d’init et le build de l’API soient cohérents.
 
 2. **Variables d’environnement**  
-   Le `docker-compose.yml` actuel utilise un fichier `.env`. Si TrueNAS ne charge pas de `.env` à côté du Custom Config :
+   Le `docker-compose.yml` actuel utilise un fichier `.env`. Pour les routes **IA** (`/api/ia/...`), définir **`HF_API_TOKEN`** dans le **`.env à la racine du projet** (pas seulement dans `ia-reco/.env` : ce fichier n’est pas copié dans l’image Docker). Avec `docker-compose.truenas.yml`, les clés `HF_*` sont passées au conteneur via substitution depuis ce même `.env`. Vérifier : `docker exec api printenv HF_API_TOKEN` (ne doit pas être vide).  
+   Si TrueNAS ne charge pas de `.env` à côté du Custom Config :
    - soit renseigner les variables dans l’interface (si l’écran le permet),
    - soit les mettre en dur dans la section `environment` du service `api` (et des Postgres) dans le YAML collé (en évitant les secrets en clair en prod).
 

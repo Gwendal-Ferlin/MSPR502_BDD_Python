@@ -149,6 +149,11 @@ services:
       JWT_SECRET: CHANGE_ME_JWT_SECRET
       JWT_ALGORITHM: HS256
       JWT_EXPIRE_MINUTES: "60"
+      # Hugging Face (scripts ia-reco) : lues depuis le .env à la racine du projet lors du « docker compose »
+      # (substitution ${...}). Mettre HF_API_TOKEN dans ce .env — pas dans ia-reco/.env seul (non monté dans l’image).
+      HF_API_TOKEN: ${HF_API_TOKEN:-}
+      HF_MODEL_ID: ${HF_MODEL_ID:-Qwen/Qwen2.5-7B-Instruct}
+      HF_TIMEOUT_SEC: ${HF_TIMEOUT_SEC:-45}
     depends_on:
       postgres-utilisateur:
         condition: service_healthy
