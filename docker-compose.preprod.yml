@@ -1,0 +1,189 @@
+# Stack pré-production : mêmes images et scripts d'init que la dev, mais volumes et ports séparés.
+# Ne touche pas aux conteneurs/volumes du docker-compose.yml principal.
+#
+# Les mots de passe Postgres ont des défauts si .env les laisse vides (l’image Docker refuse POSTGRES_PASSWORD vide).
+# Pour repartir de zéro après une erreur d’init : docker compose -f docker-compose.preprod.yml down -v
+#
+# Démarrer l’API pré-prod :
+#   docker compose -f docker-compose.preprod.yml --env-file .env up -d --build
+#
+# Lancer la suite de tests (démarre api-preprod si besoin) :
+#   docker compose -f docker-compose.preprod.yml --env-file .env --profile tests run --rm tests
+#
+# Accès local optionnel : API http://localhost:${PREPROD_PORT_API:-18000}
+
+services:
+  postgres-utilisateur-preprod:
+    image: postgres:16-alpine
+    container_name: postgres-utilisateur-preprod
+    environment:
+      POSTGRES_USER: ${POSTGRES_UTILISATEUR_USER:-utilisateur_user}
+      POSTGRES_PASSWORD: ${POSTGRES_UTILISATEUR_PASSWORD:-utilisateur_password}
+      POSTGRES_DB: utilisateur_db
+    ports:
+      - "${PREPROD_PORT_PG_UTIL:-55432}:5432"
+    volumes:
+      - pg_utilisateur_preprod_data:/var/lib/postgresql/data
+      - ./init/postgres-utilisateur:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mspr502-preprod-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d utilisateur_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  postgres-sante-preprod:
+    image: postgres:16-alpine
+    container_name: postgres-sante-preprod
+    environment:
+      POSTGRES_USER: ${POSTGRES_SANTE_USER:-sante_user}
+      POSTGRES_PASSWORD: ${POSTGRES_SANTE_PASSWORD:-sante_password}
+      POSTGRES_DB: sante_db
+    ports:
+      - "${PREPROD_PORT_PG_SANTE:-55433}:5432"
+    volumes:
+      - pg_sante_preprod_data:/var/lib/postgresql/data
+      - ./init/postgres-sante:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mspr502-preprod-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d sante_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  postgres-gamification-preprod:
+    image: postgres:16-alpine
+    container_name: postgres-gamification-preprod
+    environment:
+      POSTGRES_USER: ${POSTGRES_GAMIFICATION_USER:-gamification_user}
+      POSTGRES_PASSWORD: ${POSTGRES_GAMIFICATION_PASSWORD:-gamification_password}
+      POSTGRES_DB: gamification_db
+    ports:
+      - "${PREPROD_PORT_PG_GAMIF:-55434}:5432"
+    volumes:
+      - pg_gamification_preprod_data:/var/lib/postgresql/data
+      - ./init/postgres-gamification:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mspr502-preprod-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d gamification_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  mongodb-logs-preprod:
+    image: mongo:7
+    container_name: mongodb-logs-preprod
+    environment:
+      MONGO_INITDB_DATABASE: logs_config
+    ports:
+      - "${PREPROD_PORT_MONGO_LOGS:-27027}:27017"
+    volumes:
+      - mongo_logs_preprod_data:/data/db
+      - ./init/mongodb-logs:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mspr502-preprod-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mongodb-reco-preprod:
+    image: mongo:7
+    container_name: mongodb-reco-preprod
+    environment:
+      MONGO_INITDB_DATABASE: reco
+    ports:
+      - "${PREPROD_PORT_MONGO_RECO:-27028}:27017"
+    volumes:
+      - mongo_reco_preprod_data:/data/db
+      - ./init/mongodb-reco:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mspr502-preprod-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api-preprod:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: api-preprod
+    ports:
+      - "${PREPROD_PORT_API:-18000}:8000"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_UTILISATEUR_HOST: postgres-utilisateur-preprod
+      POSTGRES_UTILISATEUR_PORT: 5432
+      POSTGRES_UTILISATEUR_USER: ${POSTGRES_UTILISATEUR_USER:-utilisateur_user}
+      POSTGRES_UTILISATEUR_PASSWORD: ${POSTGRES_UTILISATEUR_PASSWORD:-utilisateur_password}
+      POSTGRES_SANTE_HOST: postgres-sante-preprod
+      POSTGRES_SANTE_PORT: 5432
+      POSTGRES_SANTE_USER: ${POSTGRES_SANTE_USER:-sante_user}
+      POSTGRES_SANTE_PASSWORD: ${POSTGRES_SANTE_PASSWORD:-sante_password}
+      POSTGRES_GAMIFICATION_HOST: postgres-gamification-preprod
+      POSTGRES_GAMIFICATION_PORT: 5432
+      POSTGRES_GAMIFICATION_USER: ${POSTGRES_GAMIFICATION_USER:-gamification_user}
+      POSTGRES_GAMIFICATION_PASSWORD: ${POSTGRES_GAMIFICATION_PASSWORD:-gamification_password}
+      MONGODB_LOGS_HOST: mongodb-logs-preprod
+      MONGODB_LOGS_PORT: 27017
+      MONGODB_RECO_HOST: mongodb-reco-preprod
+      MONGODB_RECO_PORT: 27017
+    depends_on:
+      postgres-utilisateur-preprod:
+        condition: service_healthy
+      postgres-sante-preprod:
+        condition: service_healthy
+      postgres-gamification-preprod:
+        condition: service_healthy
+      mongodb-logs-preprod:
+        condition: service_healthy
+      mongodb-reco-preprod:
+        condition: service_healthy
+    networks:
+      - mspr502-preprod-network
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request as u; u.urlopen('http://127.0.0.1:8000/health', timeout=5)
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 25s
+
+  tests:
+    build:
+      context: .
+      dockerfile: tests/Dockerfile
+    container_name: mspr502-tests-runner
+    environment:
+      API_BASE_URL: http://api-preprod:8000
+    depends_on:
+      api-preprod:
+        condition: service_healthy
+    networks:
+      - mspr502-preprod-network
+    profiles:
+      - tests
+
+networks:
+  mspr502-preprod-network:
+    driver: bridge
+
+volumes:
+  pg_utilisateur_preprod_data:
+  pg_sante_preprod_data:
+  pg_gamification_preprod_data:
+  mongo_logs_preprod_data:
+  mongo_reco_preprod_data:

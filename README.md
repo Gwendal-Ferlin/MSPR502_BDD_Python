@@ -65,6 +65,32 @@ flowchart LR
 docker compose down
 ```
 
+### Tests automatisés (microservice `tests/`, bases pré-prod séparées)
+
+Le dossier **`tests/`** est un petit **microservice de tests** : image Docker dédiée, **pytest** et **httpx**, uniquement des appels **HTTP** (intégration / E2E) contre l’API.
+
+Le fichier **`docker-compose.preprod.yml`** lance une stack **parallèle** à la dev : conteneurs suffixés `-preprod`, **volumes Docker distincts** (`*_preprod_data`), **ports hôte différents** (API en **18000** par défaut). Les scripts `init/` sont les mêmes : données de test isolées de `docker compose up` classique.
+
+| Action | Commande (à la racine du projet) |
+| ------ | -------------------------------- |
+| Démarrer l’API pré-prod + bases | `docker compose -f docker-compose.preprod.yml --env-file .env up -d --build` |
+| Lancer la suite pytest dans un conteneur | `docker compose -f docker-compose.preprod.yml --env-file .env --profile tests run --rm tests` |
+| API pré-prod sur la machine hôte | http://localhost:18000 (surcharge possible avec `PREPROD_PORT_API`) |
+
+Si les conteneurs **Postgres pré-prod** sortent tout de suite en erreur : l’image Docker **refuse un mot de passe vide**. Le compose pré-prod applique des **valeurs par défaut** (`utilisateur_password`, `sante_password`, `gamification_password`) lorsque le `.env` ne les remplit pas, et aligne l’API sur les mêmes valeurs. Après un premier échec d’initialisation, supprimer les volumes orphelins puis relancer : `docker compose -f docker-compose.preprod.yml down -v` puis `up -d --build`.
+
+**Sans Docker** (pré-prod ou API déjà lancée sur le port voulu) :
+
+```bash
+cd tests
+pip install -r requirements.txt
+# Windows PowerShell : $env:API_BASE_URL="http://127.0.0.1:18000"
+export API_BASE_URL=http://127.0.0.1:18000   # Linux / macOS
+python -m pytest -v tests
+```
+
+Les scénarios s’appuient sur le **seed** Postgres utilisateur (`c@c.fr` / `password`, etc., voir `init/postgres-utilisateur/02_seed.sql`).
+
 ### Initialisation des bases (schémas + données de test)
 
 **En local** (avec `docker-compose.yml`), les dossiers `init/postgres-utilisateur` et `init/postgres-sante` sont montés dans les conteneurs Postgres : au premier démarrage, les scripts `*.sql` sont exécutés automatiquement (schéma + seed si présents).
