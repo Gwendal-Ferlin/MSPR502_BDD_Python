@@ -79,6 +79,8 @@ Le fichier **`docker-compose.preprod.yml`** lance une stack **parallèle** à la
 
 Si les conteneurs **Postgres pré-prod** sortent tout de suite en erreur : l’image Docker **refuse un mot de passe vide**. Le compose pré-prod applique des **valeurs par défaut** (`utilisateur_password`, `sante_password`, `gamification_password`) lorsque le `.env` ne les remplit pas, et aligne l’API sur les mêmes valeurs. Après un premier échec d’initialisation, supprimer les volumes orphelins puis relancer : `docker compose -f docker-compose.preprod.yml down -v` puis `up -d --build`.
 
+**Tests pytest : login en 503 « Base utilisateur indisponible »** avec des tables déjà présentes : **pas besoin de recréer les volumes**. Le mot de passe que l’API utilise (`POSTGRES_UTILISATEUR_PASSWORD` dans le `.env` + compose) doit être **exactement celui avec lequel le rôle Postgres a été créé au premier démarrage** du volume. Si tu as d’abord lancé la pré-prod avec le défaut `utilisateur_password`, puis changé le `.env`, l’API peut envoyer un mot de passe que Postgres n’accepte plus → erreur SQL → 503. **Le plus simple** : dans le `.env` à la racine, remets les mêmes mots de passe que lors de la **première** init (souvent `utilisateur_password`, `sante_password`, `gamification_password` si tu n’avais rien personnalisé), puis `docker compose -f docker-compose.preprod.yml up -d api-preprod`. Alternative sans toucher au `.env` : dans le conteneur Postgres, `ALTER USER utilisateur_user WITH PASSWORD '...';` pour qu’il corresponde à ton `.env` actuel. Évite de mettre `POSTGRES_UTILISATEUR_HOST=localhost` dans le `.env` quand tu utilises la pré-prod Docker (l’API doit joindre `postgres-utilisateur-preprod` sur le réseau compose ; le `docker-compose.preprod.yml` le force déjà dans la section `environment`). Si les tables n’existent vraiment pas, seulement alors appliquer les scripts `init/postgres-utilisateur/` à la main. Après changement des tests, reconstruire l’image : `docker compose -f docker-compose.preprod.yml build tests` (ou `run --rm --build tests`).
+
 **Sans Docker** (pré-prod ou API déjà lancée sur le port voulu) :
 
 ```bash
@@ -89,7 +91,7 @@ export API_BASE_URL=http://127.0.0.1:18000   # Linux / macOS
 python -m pytest -v tests
 ```
 
-Les scénarios s’appuient sur le **seed** Postgres utilisateur (`c@c.fr` / `password`, etc., voir `init/postgres-utilisateur/02_seed.sql`).
+Les scénarios s’appuient sur le **seed** Postgres utilisateur (`c@c.fr` / `password`, etc., voir `init/postgres-utilisateur/02_seed.sql`) et le **seed Mongo** reco / logs quand il est appliqué (`init/mongodb-reco/init.js`, etc.). Les fichiers `tests/tests/test_*.py` couvrent notamment : santé OpenAPI, auth, routes protégées, gamification, santé/profils, reco (liste + création repas), journal, logs (config + événements), utilisateurs (`/me`, liste admin), IA (403 sans token ; smoke HF optionnel avec **`RUN_IA_SMOKE=1`** sur l’hôte qui lance pytest, timeout long, **`HF_API_TOKEN` requis dans l’API**).
 
 ### Initialisation des bases (schémas + données de test)
 

@@ -2,7 +2,9 @@
 # Ne touche pas aux conteneurs/volumes du docker-compose.yml principal.
 #
 # Les mots de passe Postgres ont des défauts si .env les laisse vides (l’image Docker refuse POSTGRES_PASSWORD vide).
-# Pour repartir de zéro après une erreur d’init : docker compose -f docker-compose.preprod.yml down -v
+# Le mot de passe est figé dans le volume au PREMIER démarrage : si tu changes POSTGRES_* dans .env plus tard,
+# aligne-les sur ce premier mot de passe OU fais un ALTER USER dans Postgres (inutile de supprimer le volume).
+# Pour repartir de zéro volontairement : docker compose -f docker-compose.preprod.yml down -v
 #
 # Démarrer l’API pré-prod :
 #   docker compose -f docker-compose.preprod.yml --env-file .env up -d --build
@@ -17,8 +19,8 @@ services:
     image: postgres:16-alpine
     container_name: postgres-utilisateur-preprod
     environment:
-      POSTGRES_USER: ${POSTGRES_UTILISATEUR_USER:-utilisateur_user}
-      POSTGRES_PASSWORD: ${POSTGRES_UTILISATEUR_PASSWORD:-utilisateur_password}
+      POSTGRES_USER: ${POSTGRES_UTILISATEUR_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_UTILISATEUR_PASSWORD}
       POSTGRES_DB: utilisateur_db
     ports:
       - "${PREPROD_PORT_PG_UTIL:-55432}:5432"
@@ -38,8 +40,8 @@ services:
     image: postgres:16-alpine
     container_name: postgres-sante-preprod
     environment:
-      POSTGRES_USER: ${POSTGRES_SANTE_USER:-sante_user}
-      POSTGRES_PASSWORD: ${POSTGRES_SANTE_PASSWORD:-sante_password}
+      POSTGRES_USER: ${POSTGRES_SANTE_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_SANTE_PASSWORD}
       POSTGRES_DB: sante_db
     ports:
       - "${PREPROD_PORT_PG_SANTE:-55433}:5432"
@@ -59,8 +61,8 @@ services:
     image: postgres:16-alpine
     container_name: postgres-gamification-preprod
     environment:
-      POSTGRES_USER: ${POSTGRES_GAMIFICATION_USER:-gamification_user}
-      POSTGRES_PASSWORD: ${POSTGRES_GAMIFICATION_PASSWORD:-gamification_password}
+      POSTGRES_USER: ${POSTGRES_GAMIFICATION_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_GAMIFICATION_PASSWORD}
       POSTGRES_DB: gamification_db
     ports:
       - "${PREPROD_PORT_PG_GAMIF:-55434}:5432"
@@ -124,16 +126,16 @@ services:
     environment:
       POSTGRES_UTILISATEUR_HOST: postgres-utilisateur-preprod
       POSTGRES_UTILISATEUR_PORT: 5432
-      POSTGRES_UTILISATEUR_USER: ${POSTGRES_UTILISATEUR_USER:-utilisateur_user}
-      POSTGRES_UTILISATEUR_PASSWORD: ${POSTGRES_UTILISATEUR_PASSWORD:-utilisateur_password}
+      POSTGRES_UTILISATEUR_USER: ${POSTGRES_UTILISATEUR_USER}
+      POSTGRES_UTILISATEUR_PASSWORD: ${POSTGRES_UTILISATEUR_PASSWORD}
       POSTGRES_SANTE_HOST: postgres-sante-preprod
       POSTGRES_SANTE_PORT: 5432
-      POSTGRES_SANTE_USER: ${POSTGRES_SANTE_USER:-sante_user}
-      POSTGRES_SANTE_PASSWORD: ${POSTGRES_SANTE_PASSWORD:-sante_password}
+      POSTGRES_SANTE_USER: ${POSTGRES_SANTE_USER}
+      POSTGRES_SANTE_PASSWORD: ${POSTGRES_SANTE_PASSWORD}
       POSTGRES_GAMIFICATION_HOST: postgres-gamification-preprod
       POSTGRES_GAMIFICATION_PORT: 5432
-      POSTGRES_GAMIFICATION_USER: ${POSTGRES_GAMIFICATION_USER:-gamification_user}
-      POSTGRES_GAMIFICATION_PASSWORD: ${POSTGRES_GAMIFICATION_PASSWORD:-gamification_password}
+      POSTGRES_GAMIFICATION_USER: ${POSTGRES_GAMIFICATION_USER}
+      POSTGRES_GAMIFICATION_PASSWORD: ${POSTGRES_GAMIFICATION_PASSWORD}
       MONGODB_LOGS_HOST: mongodb-logs-preprod
       MONGODB_LOGS_PORT: 27017
       MONGODB_RECO_HOST: mongodb-reco-preprod
