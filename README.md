@@ -652,11 +652,12 @@ Création d'entrées du journal alimentaire (liste via **GET** `/api/sante/journ
 
 ---
 
-### IA (programme d’exercices — Hugging Face distant)
+### IA (Hugging Face distant)
 
 | Méthode | Chemin                         | Auth | Description |
 | ------- | ------------------------------ | ---- | ----------- |
-| POST    | `/api/ia/recommandations`      | Oui  | Appelle le script `ia-reco/Ia_recom_mistral_distant.py` (Router Hugging Face). **Body** : `niveau`, `objectif`, `date_debut`, `date_fin`, `valeur_cible`, `unite`, `materiels`, et `biometrie` **ou** `suivi_biometrique` avec `poids_kg` (voir script pour les valeurs autorisées). Nécessite **`HF_API_TOKEN`** dans l’environnement de l’API. |
+| POST    | `/api/ia/recommandations`      | Oui  | Programme d’exercices : script `ia-reco/Ia_recom_mistral_distant.py`. **Body** : `niveau`, `objectif`, `date_debut`, `date_fin`, `valeur_cible`, `unite`, `materiels`, et `biometrie` **ou** `suivi_biometrique` avec `poids_kg`. **`HF_API_TOKEN`** requis. |
+| POST    | `/api/ia/plats`                | Oui  | Plan de repas : script `ia-reco/Ia_recom_mistral_plat_distant.py`. **Body** : `objectif_alimentaire` (`perte_de_poids` \| `prise_de_masse`), `repas_par_jour` (1–3), `restrictions` (liste), optionnel `budget` (1–3 ou libellé), `repas_types` (`dejeuner`, `diner`, `souper`, même taille que `repas_par_jour`). Fichiers d’ingrédients embarqués dans l’image API. **`HF_API_TOKEN`** requis. |
 
 ---
 
@@ -694,7 +695,7 @@ Notes :
 - **/api/journal** : création d'entrées du journal alimentaire + total calories jour (token).
 - **/api/logs** : evenements (token + id_anonyme selon rôle), config (public).
 - **/api/reco** : recommendations et repas (liste + détail + création), token + id_anonyme selon rôle.
-- **/api/ia** : génération de programme d’exercices via modèle distant HF (token + `HF_API_TOKEN`).
+- **/api/ia** : programme d’exercices (`/recommandations`) et plan de repas (`/plats`) via modèle distant HF (token + `HF_API_TOKEN`).
 - **/api/gamification** : inventaire, achats animaux/chromas, stats, catalogue (token selon route).
 
 Documentation interactive (Swagger) : **GET** `/docs`.

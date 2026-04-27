@@ -522,23 +522,6 @@ Interdit: aucun autre champ, aucune planification par jour, aucune explication.
         # Enleve les champs inutiles
         parsed.pop("poids_actuel", None)
         parsed.pop("poids_cible", None)
-
-    # Sortie API stable : progression toujours dérivée du calcul métier (pas seulement du LLM).
-    if isinstance(parsed.get("programme"), list):
-        parsed["niveau"] = niveau
-        parsed["objectif"] = objectif
-        parsed["progression"] = {
-            "nombre_semaines": nombre_semaines,
-            "objectifs_intermédiaires": [
-                {
-                    "objectif": palier["objectif"],
-                    "semaine": palier["semaine"],
-                    "poids_cible_kg": float(palier["poids_cible_kg"]),
-                }
-                for palier in objectif_utilisateur["objectifs_intermediaires"]
-            ],
-        }
-
     return parsed
 
 # ==============================

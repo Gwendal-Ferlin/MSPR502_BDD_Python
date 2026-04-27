@@ -7,8 +7,9 @@ RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r re
 
 COPY api/ /app/api/
 
-# Moteur IA distant (Hugging Face) + fichiers catalogue (sans le gros modèle .gguf local)
+# Moteur IA distant (Hugging Face) + catalogues (sans le gros modèle .gguf local)
 COPY ia-reco/Ia_recom_mistral_distant.py ia-reco/exercices.txt ia-reco/materiels.txt ia-reco/exercice_materiel.txt /app/ia-reco/
+COPY ia-reco/Ia_recom_mistral_plat_distant.py ia-reco/final_ingredients_list.json ia-reco/restrictions_equivalences.json /app/ia-reco/
 
 ENV PYTHONPATH=/app
 
