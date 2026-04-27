@@ -10,6 +10,7 @@ COPY --from=rclone_bin /usr/local/bin/rclone /usr/bin/rclone
 
 WORKDIR /app
 COPY run-backup.sh /app/run-backup.sh
-RUN chmod +x /app/run-backup.sh
+# Windows CRLF casse le shebang (env: 'bash\r': No such file or directory)
+RUN sed -i 's/\r$//' /app/run-backup.sh && chmod +x /app/run-backup.sh
 
 ENTRYPOINT ["/app/run-backup.sh"]

@@ -57,14 +57,15 @@ def login(
             detail="Vault manquant pour cet utilisateur",
         )
     id_anonyme = str(vault._mapping["id_anonyme"])
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
+    expire_at = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
+    # python-jose exige un NumericDate (secondes UTC), pas un datetime — sinon erreur 500 à l'encodage.
     payload = {
         "sub": str(user["id_user"]),
         "id_user": user["id_user"],
         "email": user["email"],
         "role": user["role"],
         "id_anonyme": id_anonyme,
-        "exp": expire,
+        "exp": int(expire_at.timestamp()),
     }
     access_token = jwt.encode(
         payload,

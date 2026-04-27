@@ -1,0 +1,2 @@
+# Scripts shell exécutés dans des images Linux : toujours LF
+*.sh text eol=lf
