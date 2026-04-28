@@ -22,6 +22,7 @@ from api.schemas.utilisateurs import (
 )
 from api.services.log_admin import log_admin_consultation_tiers, log_admin_suppression_utilisateur_tiers
 from api.services import field_encryption as fe
+from api.services import password_policy
 
 router = APIRouter(prefix="/utilisateurs", tags=["Utilisateurs"])
 
@@ -75,6 +76,16 @@ def create_compte(
     ).fetchone()
     if existing:
         raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
+
+    pwd_errors = password_policy.validate_password_rgpd(body.password, email)
+    if pwd_errors:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Mot de passe non conforme aux exigences de sécurité (RGPD).",
+                "exigences": pwd_errors,
+            },
+        )
 
     # 2. Hasher le mot de passe
     hashed_pw = bcrypt.hashpw(body.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -213,6 +224,18 @@ def modifier_mon_compte(
         params["email_hmac"] = hmac_v
 
     if body.password is not None:
+        effective_email = (
+            body.email.strip().lower() if body.email is not None else current_user.email
+        )
+        pwd_errors = password_policy.validate_password_rgpd(body.password, effective_email)
+        if pwd_errors:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": "Mot de passe non conforme aux exigences de sécurité (RGPD).",
+                    "exigences": pwd_errors,
+                },
+            )
         hashed_pw = bcrypt.hashpw(body.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         updates.append("password = :password")
         params["password"] = fe.persist_password_only(hashed_pw)

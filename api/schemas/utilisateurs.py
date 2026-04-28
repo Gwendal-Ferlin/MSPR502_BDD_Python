@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CompteUtilisateurRead(BaseModel):
@@ -24,14 +24,23 @@ class SouscrireAbonnement(BaseModel):
 
 class CompteUtilisateurCreate(BaseModel):
     email: str
-    password: str
+    password: str = Field(
+        ...,
+        description=(
+            "Min. 12 caractères, majuscule, minuscule, chiffre, caractère spécial ; "
+            "pas de mot trop courant ni de partie locale d’e-mail (RGPD / CNIL)."
+        ),
+    )
     date_consentement_rgpd: datetime | None = None
 
 
 class CompteUtilisateurUpdate(BaseModel):
     """Champs modifiables par l'utilisateur sur son propre compte (email, mot de passe)."""
     email: str | None = None
-    password: str | None = None
+    password: str | None = Field(
+        None,
+        description="Si renseigné : mêmes exigences que à l’inscription (RGPD / CNIL).",
+    )
 
 
 class VaultRead(BaseModel):
