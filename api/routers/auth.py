@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from jose import jwt
 import bcrypt
 from sqlalchemy import text
@@ -12,6 +12,7 @@ from api.config import settings
 from api.db.postgres_utilisateur import get_session_utilisateur
 from api.schemas.auth import LoginRequest, TokenResponse
 from api.services import field_encryption as fe
+from api.rate_limiting import apply_login_rate_limit
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -19,7 +20,9 @@ _log = logging.getLogger(__name__)
 
 
 @router.post("/login", response_model=TokenResponse)
+@apply_login_rate_limit
 def login(
+    request: Request,
     body: LoginRequest,
     db: Session = Depends(get_session_utilisateur),
 ):

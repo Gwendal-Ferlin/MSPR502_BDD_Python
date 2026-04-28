@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     # Générer : python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     data_encryption_key: str = ""
 
+    # Rate limiting (SlowAPI) — par IP ; désactiver pour tests intensifs : RATE_LIMIT_ENABLED=false
+    rate_limit_enabled: bool = True
+    rate_limit_default: str = "200/minute"
+    rate_limit_login: str = "10/minute"
+
     model_config = {
         "env_file": str(_REPO_ROOT / ".env"),
         "env_file_encoding": "utf-8",
