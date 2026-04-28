@@ -145,9 +145,10 @@ def create_repas(
     doc["id_anonyme"] = str(doc["id_anonyme"])
     doc["created_at"] = now
     base = _repas_doc_to_read(doc)
-    return RepasRead(
-        **base.model_dump(),
-        coins_earned=reward["coins_earned"],
-        total_coins=reward["total_coins"],
-        gamification_transaction_id=reward["transaction_id"],
+    return base.model_copy(
+        update={
+            "coins_earned": reward["coins_earned"],
+            "total_coins": reward["total_coins"],
+            "gamification_transaction_id": reward["transaction_id"],
+        }
     )
