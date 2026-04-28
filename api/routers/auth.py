@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from api.config import settings
 from api.db.postgres_utilisateur import get_session_utilisateur
 from api.schemas.auth import LoginRequest, TokenResponse
+from api.services import field_encryption as fe
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -23,11 +24,13 @@ def login(
     db: Session = Depends(get_session_utilisateur),
 ):
     try:
+        em_clause = fe.sql_email_match_clause()
         row = db.execute(
             text(
-                "SELECT id_user, email, password, role FROM compte_utilisateur WHERE email = :email AND COALESCE(est_supprime, false) = false"
+                f"SELECT id_user, email, password, role FROM compte_utilisateur WHERE {em_clause} "
+                "AND COALESCE(est_supprime, false) = false"
             ),
-            {"email": body.email.strip().lower()},
+            fe.params_for_email_lookup(body.email.strip().lower()),
         ).fetchone()
         if not row:
             raise HTTPException(
@@ -35,7 +38,8 @@ def login(
                 detail="Email ou mot de passe incorrect",
             )
         user = dict(row._mapping)
-        stored_hash = user["password"]
+        user["email"] = fe.decrypt_str(user["email"])
+        stored_hash = fe.decrypt_str(user["password"])
         if isinstance(stored_hash, str):
             stored_hash = stored_hash.encode("utf-8")
         try:

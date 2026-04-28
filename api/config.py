@@ -1,4 +1,9 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
+
+# Racine du dépôt (parent de api/) — pour charger .env même si uvicorn est lancé depuis un autre cwd
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
@@ -38,8 +43,12 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
 
+    # Chiffrement au repos (Fernet) pour compte_utilisateur, profil_sante, suivi_biometrique, ref_restriction
+    # Générer : python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    data_encryption_key: str = ""
+
     model_config = {
-        "env_file": ".env",
+        "env_file": str(_REPO_ROOT / ".env"),
         "env_file_encoding": "utf-8",
         "extra": "ignore",
     }

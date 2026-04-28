@@ -27,6 +27,7 @@ from api.schemas.sante import (
     MesMaterielUpdate,
 )
 from api.services.log_admin import log_admin_consultation_tiers
+from api.services import field_encryption as fe
 
 router = APIRouter(prefix="/sante", tags=["Santé"])
 
@@ -60,7 +61,7 @@ def list_profils(
             db_logs, current_user, "GET /api/sante/profils", details_extra={"liste_complete": True}
         )
         rows = db.execute(text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante")).fetchall()
-    return [ProfilSanteRead.model_validate(dict(r._mapping)) for r in rows]
+    return [ProfilSanteRead.model_validate(fe.decrypt_profil_row(dict(r._mapping))) for r in rows]
 
 
 @router.patch("/profils", response_model=ProfilSanteRead)
@@ -96,7 +97,7 @@ def modifier_mon_profil(
                 text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante WHERE id_anonyme = :id"),
                 {"id": id_anonyme},
             ).fetchone()
-            return ProfilSanteRead.model_validate(dict(r._mapping))
+            return ProfilSanteRead.model_validate(fe.decrypt_profil_row(dict(r._mapping)))
         db.execute(
             text("INSERT INTO profil_sante (id_anonyme) VALUES (:id)"),
             {"id": id_anonyme},
@@ -106,29 +107,33 @@ def modifier_mon_profil(
             text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante WHERE id_anonyme = :id"),
             {"id": id_anonyme},
         ).fetchone()
-        return ProfilSanteRead.model_validate(dict(r._mapping))
+        return ProfilSanteRead.model_validate(fe.decrypt_profil_row(dict(r._mapping)))
 
     if row:
         set_clause = ", ".join(updates)
+        enc_params = fe.encrypt_profil_params(params)
         db.execute(
             text(f"UPDATE profil_sante SET {set_clause} WHERE id_anonyme = :id"),
-            params,
+            enc_params,
         )
     else:
         annee = params.get("annee_naissance")
         sexe = params.get("sexe")
         taille = params.get("taille_cm")
         niveau = params.get("niveau_activite")
+        ins = fe.encrypt_profil_params(
+            {"id": id_anonyme, "annee_naissance": annee, "sexe": sexe, "taille_cm": taille, "niveau_activite": niveau}
+        )
         db.execute(
             text("INSERT INTO profil_sante (id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite) VALUES (:id, :annee_naissance, :sexe, :taille_cm, :niveau_activite)"),
-            {"id": id_anonyme, "annee_naissance": annee, "sexe": sexe, "taille_cm": taille, "niveau_activite": niveau},
+            ins,
         )
     db.commit()
     r = db.execute(
         text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante WHERE id_anonyme = :id"),
         {"id": id_anonyme},
     ).fetchone()
-    return ProfilSanteRead.model_validate(dict(r._mapping))
+    return ProfilSanteRead.model_validate(fe.decrypt_profil_row(dict(r._mapping)))
 
 
 @router.get("/objectifs", response_model=list[ObjectifRead])
@@ -296,7 +301,7 @@ def list_suivi_biometrique(
             db_logs, current_user, "GET /api/sante/suivi-biometrique", details_extra={"liste_complete": True}
         )
         rows = db.execute(text("SELECT id_biometrie, id_anonyme, date_releve, poids_kg, score_sommeil FROM suivi_biometrique ORDER BY date_releve DESC")).fetchall()
-    return [SuiviBiometriqueRead.model_validate(dict(r._mapping)) for r in rows]
+    return [SuiviBiometriqueRead.model_validate(fe.decrypt_biometrie_row(dict(r._mapping))) for r in rows]
 
 
 @router.post("/suivi-biometrique", response_model=SuiviBiometriqueRead, status_code=status.HTTP_201_CREATED)
@@ -307,6 +312,7 @@ def create_suivi_biometrique(
 ):
     """Crée un relevé biométrique pour l'utilisateur connecté."""
     id_anonyme = str(current_user.id_anonyme)
+    pk, sk = fe.encrypt_biometrie_write(body.poids_kg, body.score_sommeil)
     row = db.execute(
         text(
             """
@@ -318,12 +324,12 @@ def create_suivi_biometrique(
         {
             "id_anonyme": id_anonyme,
             "date_releve": body.date_releve,
-            "poids_kg": body.poids_kg,
-            "score_sommeil": body.score_sommeil,
+            "poids_kg": pk,
+            "score_sommeil": sk,
         },
     ).fetchone()
     db.commit()
-    return SuiviBiometriqueRead.model_validate(dict(row._mapping))
+    return SuiviBiometriqueRead.model_validate(fe.decrypt_biometrie_row(dict(row._mapping)))
 
 
 @router.patch("/suivi-biometrique/{id_biometrie}", response_model=SuiviBiometriqueRead)
@@ -348,16 +354,16 @@ def modifier_suivi_biometrique(
         params["date_releve"] = body.date_releve
     if body.poids_kg is not None:
         updates.append("poids_kg = :poids_kg")
-        params["poids_kg"] = body.poids_kg
+        params["poids_kg"] = fe.encrypt_float(body.poids_kg)
     if body.score_sommeil is not None:
         updates.append("score_sommeil = :score_sommeil")
-        params["score_sommeil"] = body.score_sommeil
+        params["score_sommeil"] = fe.encrypt_int(body.score_sommeil)
     if not updates:
         r = db.execute(
             text("SELECT id_biometrie, id_anonyme, date_releve, poids_kg, score_sommeil FROM suivi_biometrique WHERE id_biometrie = :id"),
             {"id": id_biometrie},
         ).fetchone()
-        return SuiviBiometriqueRead.model_validate(dict(r._mapping))
+        return SuiviBiometriqueRead.model_validate(fe.decrypt_biometrie_row(dict(r._mapping)))
     set_clause = ", ".join(updates)
     db.execute(text(f"UPDATE suivi_biometrique SET {set_clause} WHERE id_biometrie = :id"), params)
     db.commit()
@@ -365,7 +371,7 @@ def modifier_suivi_biometrique(
         text("SELECT id_biometrie, id_anonyme, date_releve, poids_kg, score_sommeil FROM suivi_biometrique WHERE id_biometrie = :id"),
         {"id": id_biometrie},
     ).fetchone()
-    return SuiviBiometriqueRead.model_validate(dict(r._mapping))
+    return SuiviBiometriqueRead.model_validate(fe.decrypt_biometrie_row(dict(r._mapping)))
 
 
 @router.get("/mes-restrictions", response_model=list[RestrictionRead])
@@ -384,7 +390,7 @@ def list_mes_restrictions(
         """),
         {"id": id_anonyme},
     ).fetchall()
-    return [RestrictionRead.model_validate(dict(r._mapping)) for r in rows]
+    return [RestrictionRead.model_validate(fe.decrypt_restriction_row(dict(r._mapping))) for r in rows]
 
 
 @router.put("/mes-restrictions", response_model=list[RestrictionRead])
@@ -411,7 +417,7 @@ def modifier_mes_restrictions(
         """),
         {"id": id_anonyme},
     ).fetchall()
-    return [RestrictionRead.model_validate(dict(r._mapping)) for r in rows]
+    return [RestrictionRead.model_validate(fe.decrypt_restriction_row(dict(r._mapping))) for r in rows]
 
 
 @router.get("/mes-materiel", response_model=list[ReferentielRead])
@@ -466,7 +472,7 @@ def list_restrictions(
     db: Session = Depends(get_session_sante),
 ):
     rows = db.execute(text("SELECT id_restriction AS id, nom, type FROM ref_restriction")).fetchall()
-    return [RestrictionRead.model_validate(dict(r._mapping)) for r in rows]
+    return [RestrictionRead.model_validate(fe.decrypt_restriction_row(dict(r._mapping))) for r in rows]
 
 
 @router.get("/referentiels/exercices", response_model=list[ReferentielRead])

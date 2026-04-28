@@ -12,8 +12,8 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE ref_restriction (
     id_restriction SERIAL PRIMARY KEY,
-    nom VARCHAR(255) NOT NULL,
-    type VARCHAR(100)
+    nom TEXT NOT NULL,
+    type TEXT
 );
 
 CREATE TABLE ref_exercice (
@@ -41,10 +41,10 @@ CREATE TABLE exercice_materiel (
 CREATE TABLE profil_sante (
     id_profil SERIAL PRIMARY KEY,
     id_anonyme UUID NOT NULL UNIQUE,
-    annee_naissance INTEGER,
-    sexe VARCHAR(50),
-    taille_cm INTEGER,
-    niveau_activite VARCHAR(50)
+    annee_naissance TEXT,
+    sexe TEXT,
+    taille_cm TEXT,
+    niveau_activite TEXT
 );
 
 CREATE INDEX idx_profil_sante_id_anonyme ON profil_sante(id_anonyme);
@@ -74,8 +74,8 @@ CREATE TABLE suivi_biometrique (
     id_biometrie SERIAL PRIMARY KEY,
     id_anonyme UUID NOT NULL,
     date_releve TIMESTAMPTZ NOT NULL,
-    poids_kg DOUBLE PRECISION,
-    score_sommeil INTEGER
+    poids_kg TEXT,
+    score_sommeil TEXT
 );
 
 CREATE INDEX idx_biometrie_id_anonyme ON suivi_biometrique(id_anonyme);

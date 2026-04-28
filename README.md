@@ -17,7 +17,24 @@ API unique pour les microservices **Utilisateur**, **Santé**, **Logs** et **Rec
    ```bash
    cp .env.example .env
    ```
-2. **Renseigner les variables** dans `.env` (mots de passe Postgres, `JWT_SECRET` pour l’auth). Ne pas versionner `.env`.
+2. **Renseigner les variables** dans `.env` (mots de passe Postgres, `JWT_SECRET` pour l’auth, **`DATA_ENCRYPTION_KEY`** si tu utilises les seeds santé chiffrés — voir ci-dessous). Ne pas versionner `.env`.
+
+### Chiffrement au repos (Fernet, `DATA_ENCRYPTION_KEY`)
+
+L’API peut chiffrer **au niveau applicatif** certains champs PostgreSQL sensibles (Fernet, clé **`DATA_ENCRYPTION_KEY`** dans le `.env` à la racine) :
+
+| Zone | Champs concernés (aperçu) |
+| ---- | ------------------------- |
+| Microservice **utilisateur** | email, mot de passe (hash bcrypt), index **`email_hmac`** pour la recherche |
+| Microservice **santé** | `profil_sante` (année, sexe, taille, niveau d’activité), `suivi_biometrique` (poids, score sommeil), `ref_restriction` (nom, type) |
+
+- **Comportement** : si la clé est **non vide**, l’API **chiffre** à l’écriture et **déchiffre** à la lecture. Si la clé est **vide**, les écritures restent en clair pour ces colonnes (mode historique) ; les valeurs **déjà** stockées en Fernet ne sont pas interprétées comme des nombres — les réponses JSON peuvent alors montrer `null` sur ces champs (évite une erreur serveur).
+- **Seed santé** : le fichier **`init/postgres-sante/02_seed.sql`** insère des valeurs **pré-chiffrées** avec la **clé de développement** indiquée dans **`.env.example`**. Pour afficher correctement ces données (ex. `GET /api/sante/suivi-biometrique`, référentiel restrictions, profils), mets **la même** `DATA_ENCRYPTION_KEY` dans ton `.env` (sans guillemets). Pour régénérer les littéraux SQL après changement de clé : **`scripts/emit_encrypted_sante_seed.py`** (voir commentaires du script ; clé à aligner avec `.env`).
+- **Docker** : Compose injecte le `.env` dans le conteneur `api` au **démarrage**. Après avoir modifié `DATA_ENCRYPTION_KEY`, exécuter par exemple `docker compose up -d api` ou `docker compose restart api`.
+- **Hors Docker** : `api/config.py` charge le fichier **`.env` à la racine du dépôt** (chemin absolu depuis le package `api/`), même si la commande est lancée depuis un autre répertoire courant.
+- **Production** : générer une clé dédiée, par exemple  
+  `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`  
+  ne pas réutiliser la clé de démo du dépôt ; prévoir migration ou réinjection des données pour la nouvelle clé.
 
 ### Démarrage
 
@@ -95,7 +112,7 @@ Les scénarios s’appuient sur le **seed** Postgres utilisateur (`c@c.fr` / `pa
 
 ### Initialisation des bases (schémas + données de test)
 
-**En local** (avec `docker-compose.yml`), les dossiers `init/postgres-utilisateur` et `init/postgres-sante` sont montés dans les conteneurs Postgres : au premier démarrage, les scripts `*.sql` sont exécutés automatiquement (schéma + seed si présents).
+**En local** (avec `docker-compose.yml`), les dossiers `init/postgres-utilisateur` et `init/postgres-sante` sont montés dans les conteneurs Postgres : au premier démarrage, les scripts `*.sql` sont exécutés automatiquement (schéma + seed si présents). Le seed **`init/postgres-sante/02_seed.sql`** contient des champs sensibles (**restrictions**, **profils**, **suivi biométrique**) au format **Fernet** ; ils correspondent à la clé documentée dans **`.env.example`** (`DATA_ENCRYPTION_KEY`).
 
 **Sur le serveur / TrueNAS** (avec `docker-compose.truenas.yml`), les bases démarrent vides. Après `docker compose -f docker-compose.truenas.yml up -d --build`, exécuter les scripts à la main (depuis la racine du projet) :
 
@@ -693,7 +710,7 @@ Notes :
 - **/** : racine, health (publics).
 - **/api/auth** : login (public).
 - **/api/utilisateurs** : comptes et vault (token + règles par rôle).
-- **/api/sante** : profils, objectifs, journal (liste), séances, référentiels (token + id_anonyme selon rôle).
+- **/api/sante** : profils, objectifs, journal (liste), séances, référentiels, suivi biométrique (token + `id_anonyme` selon rôle) ; certains champs sont **chiffrés** en base lorsque `DATA_ENCRYPTION_KEY` est défini (voir section **Chiffrement au repos**).
 - **/api/journal** : création d'entrées du journal alimentaire + total calories jour (token).
 - **/api/logs** : evenements (token + id_anonyme selon rôle), config (public).
 - **/api/reco** : recommendations et repas (liste + détail + création), token + id_anonyme selon rôle.
@@ -836,6 +853,7 @@ Symptômes et erreurs fréquentes en local (Docker Compose) ou après déploieme
 | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | Conteneur Postgres qui redémarre en boucle ou erreur au démarrage | `POSTGRES_*_PASSWORD` vide ou absent alors que l’image Postgres l’exige.                           | Renseigner tous les mots de passe dans `.env` (copie depuis `.env.example`). Ne pas commiter `.env`.                             |
 | Erreur 401 / `Token invalide ou expiré`                           | JWT expiré, secret différent entre environnements, ou header `Authorization` manquant / mal formé. | Se reconnecter via `POST /api/auth/login` ; vérifier `JWT_SECRET` cohérent dans `.env` avec celui utilisé au démarrage de l’API. |
+| `poids_kg` / `score_sommeil` (ou champs profil) à **`null`** dans le JSON alors que la base contient des `gAAAAA…` | `DATA_ENCRYPTION_KEY` **absente**, **différente** de celle utilisée pour générer le seed, ou API **non redémarrée** après changement du `.env`. | Aligner la clé sur **`.env.example`** pour le jeu de données fourni ; `docker compose restart api` ; vérifier avec `docker exec api printenv DATA_ENCRYPTION_KEY`. Si tu changes de clé, régénérer le seed avec **`scripts/emit_encrypted_sante_seed.py`** ou réinitialiser le volume santé (`docker compose down -v` puis `up`, données perdues). |
 
 ### Bases de données et données
 
@@ -852,7 +870,7 @@ Problèmes typiques quand l’application tourne sur une **machine distante** (V
 | Symptôme                                                                | Cause probable                                                                                                                                                           | Piste de résolution                                                                                                                                                                        |
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `Permission denied` ou montage `init/` introuvable                      | Chemins **relatifs** (`./init/...`) invalides si le répertoire courant n’est pas la racine du projet, ou permissions du système de fichiers (NFS, stockage réseau, ACL). | Lancer Compose depuis la **racine du dépôt** ; sinon remplacer les chemins par des chemins **absolus** sur le serveur. Vérifier droits lecture sur les scripts d’init.                     |
-| Variables d’environnement ignorées                                      | Le fichier `.env` n’est pas chargé (outil graphique, répertoire de travail différent, secrets injectés ailleurs).                                                        | Définir les variables dans l’interface d’hébergement ou dans la section `environment` du Compose (sans committer les secrets en clair) ; aligner `JWT_SECRET` et mots de passe avec l’API. |
+| Variables d’environnement ignorées                                      | Le fichier `.env` n’est pas chargé (outil graphique, secrets injectés ailleurs) ou l’API n’a pas été **redémarrée** après modification.                                   | Sous Docker : vérifier `env_file` / `environment` du Compose. En local, l’API charge le **`.env` à la racine du dépôt** (voir **`api/config.py`**). Redémarrer le service `api` après changement de secrets (`JWT_SECRET`, `DATA_ENCRYPTION_KEY`, mots de passe Postgres). |
 | Ports exposés différents du README (8000, 5432, etc.)                   | Fichier Compose **adapté** au serveur (autre mapping), ou **conflit** avec des services déjà présents sur l’hôte.                                                        | Lire les `ports:` du YAML réellement déployé ; adapter URL, firewall et documentation interne.                                                                                             |
 | API injoignable depuis l’extérieur alors que `docker compose ps` est OK | Pare-feu (ufw, security groups cloud, règles NAS), ou écoute uniquement sur `127.0.0.1`.                                                                                 | Ouvrir le port applicatif ; placer un **reverse proxy** (nginx, Traefik, Caddy) si HTTPS / nom de domaine.                                                                                 |
 | Build de l’image `api` impossible sur le serveur                        | Pas d’accès Internet pour tirer les images de base, ou politique interdisant le build.                                                                                   | Builder l’image sur une CI ou une machine autorisée, pousser vers un **registry**, puis utiliser `image:` à la place de `build:` dans le Compose.                                          |
@@ -870,3 +888,4 @@ Problèmes typiques quand l’application tourne sur une **machine distante** (V
 - **État des conteneurs** : `docker compose ps` (tous **healthy** ou **running** pour l’API).
 - **API vivante** : `GET http://localhost:8000/health` → `{"status":"ok"}`.
 - **Logs** : `docker logs api` ou `docker logs postgres-sante` (dernières lignes en cas d’erreur).
+- **Clé Fernet vue par l’API** (doit être non vide en dev si tu utilises le seed santé chiffré) : `docker exec api printenv DATA_ENCRYPTION_KEY`

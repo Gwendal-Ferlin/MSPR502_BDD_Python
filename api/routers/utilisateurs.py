@@ -21,6 +21,7 @@ from api.schemas.utilisateurs import (
     SouscrireAbonnement,
 )
 from api.services.log_admin import log_admin_consultation_tiers, log_admin_suppression_utilisateur_tiers
+from api.services import field_encryption as fe
 
 router = APIRouter(prefix="/utilisateurs", tags=["Utilisateurs"])
 
@@ -69,30 +70,32 @@ def create_compte(
     email = body.email.strip().lower()
     # 1. Vérifier si l'email existe déjà
     existing = db.execute(
-        text("SELECT id_user FROM compte_utilisateur WHERE email = :email"),
-        {"email": email}
+        text(f"SELECT id_user FROM compte_utilisateur WHERE {fe.sql_email_match_clause()}"),
+        fe.params_for_email_lookup(email),
     ).fetchone()
     if existing:
         raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
 
     # 2. Hasher le mot de passe
     hashed_pw = bcrypt.hashpw(body.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    email_db, email_hmac, pwd_db = fe.persist_compte_email_password(email, hashed_pw)
 
     # 3. Créer le compte (Role: Client, Abonnement: Freemium)
     new_user_row = db.execute(
         text(f"""
-            INSERT INTO compte_utilisateur (email, password, role, type_abonnement, date_consentement_rgpd)
-            VALUES (:email, :password, 'Client', 'Freemium', :rgpd)
+            INSERT INTO compte_utilisateur (email, email_hmac, password, role, type_abonnement, date_consentement_rgpd)
+            VALUES (:email, :email_hmac, :password, 'Client', 'Freemium', :rgpd)
             RETURNING {SELECT_COMPTE_COLS}
         """),
         {
-            "email": email,
-            "password": hashed_pw,
-            "rgpd": body.date_consentement_rgpd
-        }
+            "email": email_db,
+            "email_hmac": email_hmac,
+            "password": pwd_db,
+            "rgpd": body.date_consentement_rgpd,
+        },
     ).fetchone()
 
-    new_user = dict(new_user_row._mapping)
+    new_user = fe.decrypt_compte_row(dict(new_user_row._mapping))
 
     # 4. Créer l'entrée dans le vault pour le lien anonymisé
     db.execute(
@@ -163,7 +166,7 @@ def list_comptes(
     rows = db.execute(
         text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE COALESCE(est_supprime, false) = false")
     ).fetchall()
-    return [CompteUtilisateurRead.model_validate(dict(r._mapping)) for r in rows]
+    return [CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(r._mapping))) for r in rows]
 
 
 @router.get("/me", response_model=CompteUtilisateurRead)
@@ -179,7 +182,7 @@ def get_mon_compte(
     ).fetchone()
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé")
-    return CompteUtilisateurRead.model_validate(dict(row._mapping))
+    return CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(row._mapping)))
 
 
 @router.patch("/me", response_model=CompteUtilisateurRead)
@@ -196,18 +199,23 @@ def modifier_mon_compte(
     if body.email is not None:
         email = body.email.strip().lower()
         existing = db.execute(
-            text("SELECT id_user FROM compte_utilisateur WHERE email = :email AND id_user != :id"),
-            {"email": email, "id": id_user},
+            text(
+                f"SELECT id_user FROM compte_utilisateur WHERE {fe.sql_email_match_clause()} AND id_user != :id"
+            ),
+            {**fe.params_for_email_lookup(email), "id": id_user},
         ).fetchone()
         if existing:
             raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
+        em_db, hmac_v = fe.persist_email_only(email)
         updates.append("email = :email")
-        params["email"] = email
+        updates.append("email_hmac = :email_hmac")
+        params["email"] = em_db
+        params["email_hmac"] = hmac_v
 
     if body.password is not None:
         hashed_pw = bcrypt.hashpw(body.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
         updates.append("password = :password")
-        params["password"] = hashed_pw
+        params["password"] = fe.persist_password_only(hashed_pw)
 
     if not updates:
         _appliquer_fin_periode_si_necessaire(db, id_user)
@@ -217,7 +225,7 @@ def modifier_mon_compte(
         ).fetchone()
         if not row:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé")
-        return CompteUtilisateurRead.model_validate(dict(row._mapping))
+        return CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(row._mapping)))
 
     set_clause = ", ".join(updates)
     db.execute(
@@ -230,7 +238,7 @@ def modifier_mon_compte(
         text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"),
         {"id": id_user},
     ).fetchone()
-    return CompteUtilisateurRead.model_validate(dict(row._mapping))
+    return CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(row._mapping)))
 
 
 @router.post("/me/abonnement/souscrire", response_model=CompteUtilisateurRead)
@@ -261,7 +269,7 @@ def souscrire_abonnement(
         text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"),
         {"id": id_user},
     ).fetchone()
-    return CompteUtilisateurRead.model_validate(dict(row._mapping))
+    return CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(row._mapping)))
 
 
 @router.post("/me/abonnement/desabonner", response_model=CompteUtilisateurRead)
@@ -285,7 +293,7 @@ def desabonner(
             text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"),
             {"id": id_user},
         ).fetchone()
-        return CompteUtilisateurRead.model_validate(dict(r._mapping))
+        return CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(r._mapping)))
     db.execute(
         text("UPDATE compte_utilisateur SET desabonnement_a_fin_periode = true WHERE id_user = :id"),
         {"id": id_user},
@@ -296,7 +304,7 @@ def desabonner(
         text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"),
         {"id": id_user},
     ).fetchone()
-    return CompteUtilisateurRead.model_validate(dict(r._mapping))
+    return CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(r._mapping)))
 
 
 @router.delete("/{id_user}", status_code=status.HTTP_204_NO_CONTENT)
@@ -349,7 +357,7 @@ def get_compte(
     ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Compte non trouvé")
-    return CompteUtilisateurRead.model_validate(dict(row._mapping))
+    return CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(row._mapping)))
 
 
 @router.get("/{id_user}/vault", response_model=VaultRead)

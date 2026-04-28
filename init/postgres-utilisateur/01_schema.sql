@@ -5,8 +5,9 @@
 
 CREATE TABLE compte_utilisateur (
     id_user SERIAL PRIMARY KEY,
-    email VARCHAR(255) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
+    email TEXT NOT NULL,
+    email_hmac VARCHAR(64),
+    password TEXT NOT NULL,
     role VARCHAR(50) NOT NULL CHECK (role IN ('Admin', 'Super-Admin', 'Client')),
     type_abonnement VARCHAR(50) NOT NULL CHECK (type_abonnement IN ('Freemium', 'Premium', 'Premium+')),
     date_consentement_rgpd TIMESTAMPTZ,
@@ -14,6 +15,9 @@ CREATE TABLE compte_utilisateur (
     date_fin_periode_payee TIMESTAMPTZ,
     desabonnement_a_fin_periode BOOLEAN NOT NULL DEFAULT false
 );
+
+CREATE UNIQUE INDEX idx_compte_email_hmac ON compte_utilisateur(email_hmac) WHERE email_hmac IS NOT NULL;
+CREATE UNIQUE INDEX ux_compte_email_plain ON compte_utilisateur (lower(trim(email))) WHERE email_hmac IS NULL;
 
 -- ==========================================
 -- ZONE PIVOT (Lien anonymisé - RGPD)
