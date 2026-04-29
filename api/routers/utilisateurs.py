@@ -354,7 +354,9 @@ def supprimer_compte(
         )
 
     db.execute(
-        text("UPDATE compte_utilisateur SET est_supprime = true WHERE id_user = :id"),
+        text(
+            "UPDATE compte_utilisateur SET est_supprime = true, date_suppression = now() WHERE id_user = :id"
+        ),
         {"id": id_user},
     )
     db.commit()

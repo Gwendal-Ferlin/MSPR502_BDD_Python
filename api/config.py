@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
 
+    # RGPD — durée après laquelle un compte en suppression logique est effacé physiquement (script purge_comptes_rgpd)
+    rgpd_soft_delete_retention_days: int = 730
+
     # Chiffrement au repos (Fernet) pour compte_utilisateur, profil_sante, suivi_biometrique, ref_restriction
     # Générer : python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     data_encryption_key: str = ""

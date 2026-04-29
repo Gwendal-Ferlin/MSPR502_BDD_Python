@@ -12,6 +12,7 @@ CREATE TABLE compte_utilisateur (
     type_abonnement VARCHAR(50) NOT NULL CHECK (type_abonnement IN ('Freemium', 'Premium', 'Premium+')),
     date_consentement_rgpd TIMESTAMPTZ,
     est_supprime BOOLEAN NOT NULL DEFAULT false,
+    date_suppression TIMESTAMPTZ,
     date_fin_periode_payee TIMESTAMPTZ,
     desabonnement_a_fin_periode BOOLEAN NOT NULL DEFAULT false
 );
