@@ -38,5 +38,26 @@ def load_ia_plats_module() -> Any:
 
 def generer_plats(data: dict[str, Any]) -> dict[str, Any]:
     """Délègue à `generer_recommandations_plats` du script distant."""
+    from api.services.ia_referentiels_db import (
+        load_ingredients_by_budget,
+        load_restriction_equivalences,
+        persist_new_restriction_equivalence,
+    )
+
     mod = load_ia_plats_module()
-    return mod.generer_recommandations_plats(data)
+    payload = dict(data)
+
+    equiv = load_restriction_equivalences()
+    if equiv:
+        payload["_restriction_equivalences"] = equiv
+        payload["_persist_restrictions"] = persist_new_restriction_equivalence
+
+    try:
+        niveau_budget, _ = mod.normaliser_budget(payload.get("budget"))
+    except Exception:
+        niveau_budget = 2
+    ingredients = load_ingredients_by_budget(niveau_budget)
+    if ingredients is not None:
+        payload["_ingredients_catalogue"] = ingredients
+
+    return mod.generer_recommandations_plats(payload)

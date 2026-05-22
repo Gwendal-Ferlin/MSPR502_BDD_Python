@@ -6,7 +6,17 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from api.config import settings
 from api.rate_limiting import limiter
-from api.routers import auth, utilisateurs, sante, logs, reco, journal, gamification, ia_reco
+from api.routers import (
+    auth,
+    utilisateurs,
+    sante,
+    logs,
+    reco,
+    journal,
+    gamification,
+    ia_reco,
+    ia_referentiels_public,
+)
 
 app = FastAPI(
     title="HealthAI Coach API",
@@ -34,6 +44,7 @@ app.include_router(logs.router, prefix="/api")
 app.include_router(reco.router, prefix="/api")
 app.include_router(gamification.router, prefix="/api")
 app.include_router(ia_reco.router, prefix="/api")
+app.include_router(ia_referentiels_public.router, prefix="/api")
 
 
 @app.get("/")

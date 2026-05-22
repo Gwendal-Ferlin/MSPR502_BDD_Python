@@ -40,5 +40,21 @@ def load_ia_module() -> Any:
 
 def generer_programme(data: dict[str, Any]) -> dict[str, Any]:
     """Délègue à `generer_programme` du script Mistral distant (appel HF Router)."""
+    from api.services.ia_referentiels_db import (
+        load_exercice_materiel_liaisons,
+        load_exercices_catalogue,
+        load_materiels_catalogue,
+    )
+
     mod = load_ia_module()
-    return mod.generer_programme(data)
+    payload = dict(data)
+    exercices = load_exercices_catalogue()
+    if exercices:
+        payload["_exercices_catalogue"] = exercices
+    materiels = load_materiels_catalogue()
+    if materiels:
+        payload["_materiels_catalogue"] = materiels
+    liaisons = load_exercice_materiel_liaisons()
+    if liaisons:
+        payload["_exercice_materiel_liaisons"] = liaisons
+    return mod.generer_programme(payload)

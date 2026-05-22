@@ -427,8 +427,11 @@ def normaliser_budget(budget_brut):
 	raise ValueError("Budget invalide")
 
 
-def charger_ingredients_par_budget(niveau_budget, max_items=120):
-	"""Lit le fichier d'ingredients (format JSONL/NDJSON) et filtre par budget <= niveau."""
+def charger_ingredients_par_budget(niveau_budget, max_items=120, preloaded=None):
+	"""Lit la base ou le fichier d'ingredients (JSONL) et filtre par budget <= niveau."""
+	if preloaded is not None:
+		return preloaded[:max_items] if preloaded else []
+
 	if not os.path.exists(INGREDIENTS_FILE):
 		return []
 
@@ -613,8 +616,33 @@ def generer_recommandations_plats(data):
 	# Dedoublonnage simple en preservant l'ordre.
 	seen = set()
 	restrictions = [x for x in restrictions if not (str(x).strip().lower() in seen or seen.add(str(x).strip().lower()))]
-	register_new_restrictions(restrictions, RESTRICTIONS_EQ_FILE)
-	ingredients_autorises = charger_ingredients_par_budget(niveau_budget)
+	eq_override = data.get("_restriction_equivalences")
+	persist_restrictions = data.get("_persist_restrictions")
+	if isinstance(eq_override, dict) and eq_override:
+		global RESTRICTION_EQUIVALENCES, RESTRICTION_ALIAS_INDEX
+		RESTRICTION_EQUIVALENCES = eq_override
+		RESTRICTION_ALIAS_INDEX = build_restriction_alias_index(RESTRICTION_EQUIVALENCES)
+		for raw in restrictions:
+			key = normalize_text(raw)
+			if not key or key in RESTRICTION_EQUIVALENCES or key in RESTRICTION_ALIAS_INDEX:
+				continue
+			RESTRICTION_EQUIVALENCES[key] = [key]
+			if callable(persist_restrictions):
+				try:
+					persist_restrictions(key, [key])
+				except Exception:
+					pass
+		RESTRICTION_ALIAS_INDEX = build_restriction_alias_index(RESTRICTION_EQUIVALENCES)
+	else:
+		register_new_restrictions(restrictions, RESTRICTIONS_EQ_FILE)
+
+	if "_ingredients_catalogue" in data:
+		ingredients_autorises = charger_ingredients_par_budget(
+			niveau_budget,
+			preloaded=data.get("_ingredients_catalogue") or [],
+		)
+	else:
+		ingredients_autorises = charger_ingredients_par_budget(niveau_budget)
 	restriction_terms = build_restriction_terms(restrictions, [x.get("nom", "") for x in ingredients_autorises])
 	ingredients_autorises = filter_ingredients_by_restrictions(ingredients_autorises, restriction_terms)
 	if not ingredients_autorises:

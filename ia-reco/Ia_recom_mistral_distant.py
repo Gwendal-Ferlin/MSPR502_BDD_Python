@@ -405,9 +405,15 @@ def generer_programme(data):
     )
 
     # Etape 2: chargement du catalogue d'exercices/materiels/liaisons.
-    exercices = charger_exercices("exercices.txt")
-    materiels = charger_materiels("materiels.txt")
-    liaisons = charger_liaisons("exercice_materiel.txt")
+    exercices = data.get("_exercices_catalogue")
+    if not exercices:
+        exercices = charger_exercices("exercices.txt")
+    materiels = data.get("_materiels_catalogue")
+    if not materiels:
+        materiels = charger_materiels("materiels.txt")
+    liaisons = data.get("_exercice_materiel_liaisons")
+    if not liaisons:
+        liaisons = charger_liaisons("exercice_materiel.txt")
 
     # Mapping des materiels utilisateur vers leurs IDs connus.
     ids_materiels_user = {

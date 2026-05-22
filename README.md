@@ -189,6 +189,20 @@ docker cp init/postgres-sante/05_migration_profil_niveau_activite.sql postgres-s
 docker exec postgres-sante psql -U sante_user -d sante_db -f /tmp/05_migration_profil_niveau_activite.sql
 ```
 
+**10) Référentiels IA en base (Postgres santé déjà existant) :**  
+Crée `ref_ingredient`, `ref_restriction_equivalence`, `ref_restriction_alias` et ajoute `niveau` sur `ref_exercice`. Le **peuplement** (exercices, équivalences, ~326k ingrédients) se fait ensuite avec le script Python (voir ci-dessous).
+
+```bash
+docker cp init/postgres-sante/07_migration_ia_referentiels.sql postgres-sante:/tmp/
+docker exec postgres-sante psql -U sante_user -d sante_db -f /tmp/07_migration_ia_referentiels.sql
+docker compose up -d api
+docker compose run --rm api python scripts/import_ia_referentiels_sante.py
+```
+
+Après un `docker compose build api`, il faut **recréer** le conteneur (`up -d api`) : un simple `exec` sur l’ancien conteneur ne voit pas le script copié dans la nouvelle image.
+
+Sur une **nouvelle** base locale (`docker compose up` avec volume vierge), les tables sont déjà dans `01_schema.sql` ; exécuter uniquement l’import si les fichiers `ia-reco/` sont présents.
+
 Pour des bases déjà créées en local (volumes existants) sans init auto, les mêmes commandes Postgres/Mongo ci-dessus s’appliquent.
 
 ### Données et persistance
@@ -310,7 +324,26 @@ erDiagram
         int id_exercice PK
         string nom
         string muscle_principal
+        string niveau
     }
+    REF_INGREDIENT {
+        string id_externe PK
+        string nom
+        float calories
+        float proteines
+        float lipides
+        float glucides
+        int budget
+    }
+    REF_RESTRICTION_EQUIVALENCE {
+        string cle_canonique PK
+    }
+    REF_RESTRICTION_ALIAS {
+        int id_alias PK
+        string cle_canonique FK
+        string alias
+    }
+    REF_RESTRICTION_EQUIVALENCE ||--o{ REF_RESTRICTION_ALIAS : "alias"
     MATERIEL {
         int id_materiel PK
         string nom
@@ -408,7 +441,26 @@ erDiagram
         int id_exercice PK
         string nom
         string muscle_principal
+        string niveau
     }
+    REF_INGREDIENT {
+        string id_externe PK
+        string nom
+        float calories
+        float proteines
+        float lipides
+        float glucides
+        int budget
+    }
+    REF_RESTRICTION_EQUIVALENCE {
+        string cle_canonique PK
+    }
+    REF_RESTRICTION_ALIAS {
+        int id_alias PK
+        string cle_canonique FK
+        string alias
+    }
+    REF_RESTRICTION_EQUIVALENCE ||--o{ REF_RESTRICTION_ALIAS : "alias"
     MATERIEL {
         int id_materiel PK
         string nom
@@ -550,7 +602,7 @@ erDiagram
 | Base / Store                     | Rôle                                                                                                                                          |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | **PostgreSQL** `utilisateur_db`  | `compte_utilisateur`, `vault_correspondance` (lien id_user ↔ id_anonyme)                                                                      |
-| **PostgreSQL** `sante_db`        | Profil santé, objectifs, suivi biométrique, journal alimentaire, séances, référentiels (restrictions, exercices, matériel), tables de liaison |
+| **PostgreSQL** `sante_db`        | Profil santé, objectifs, suivi biométrique, journal alimentaire, séances, référentiels (restrictions utilisateur, exercices IA, ingrédients IA, équivalences restrictions, matériel), tables de liaison |
 | **PostgreSQL** `gamification_db` | Inventaire animaux/chromas par utilisateur, monnaie (pépites), transactions, catalogues animaux et chromas                                    |
 | **MongoDB** `logs_config`        | Événements / logs (collection `evenements`) et config                                                                                         |
 | **MongoDB** `reco`               | Recommandations (collection `recommendations`), repas/recettes par utilisateur (collection `repas`)                                           |
@@ -639,6 +691,19 @@ Toutes les routes exigent un token. Pour un **Client**, les données sont limit�
 | GET     | `/api/sante/referentiels/exercices`           | —                              | Non                                                  | Liste le référentiel des exercices (nom, muscle_principal).                                                                                                               |
 | GET     | `/api/sante/referentiels/materiel`            | —                              | Non                                                  | Liste le référentiel du matériel.                                                                                                                                         |
 
+#### Référentiels IA (public, sans JWT)
+
+Données importées depuis `ia-reco/` (`scripts/import_ia_referentiels_sante.py`, 4 étapes : exercices, matériel + liaisons, équivalences, ingrédients). L’import matériel **réinitialise** `utilisateur_materiel` (associations utilisateur au matériel). Distinct des référentiels « utilisateur » ci-dessus (`ref_restriction` chiffré, exercices seed démo).
+
+| Méthode | Chemin                                              | Auth   | Description                                                                                                                                                                      |
+| ------- | --------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET     | `/api/sante/referentiels/ia/exercices`              | Public | Catalogue exercices IA (`ref_exercice`, avec `niveau`). **Query** : `niveau` (optionnel : `facile`, `normal`, `intensif`).                                                       |
+| GET     | `/api/sante/referentiels/ia/materiel`               | Public | Catalogue matériel IA (`materiels.txt` → `materiel`, IDs 1…n).                                                                                                                 |
+| GET     | `/api/sante/referentiels/ia/exercice-materiel`      | Public | Liaisons exercice ↔ matériel (`exercice_materiel.txt`). **Query** : `id_exercice`, `id_materiel` (filtres optionnels).                                                            |
+| GET     | `/api/sante/referentiels/ia/ingredients`            | Public | Catalogue ingrédients / plats IA (`ref_ingredient`), **paginé**. **Query** : `budget_max` (1–3), `q` (recherche nom), `limit` (déf. 50, max 500), `offset`.                      |
+| GET     | `/api/sante/referentiels/ia/plats`                  | Public | Alias de `/ingredients` (même réponse).                                                                                                                                          |
+| GET     | `/api/sante/referentiels/ia/restrictions-equivalences` | Public | Équivalences FR/EN pour filtrage IA (`ref_restriction_equivalence` + `ref_restriction_alias`). Réponse : `{ "items": [{ "cle_canonique", "aliases": [...] }, ...] }`.            |
+
 ---
 
 ### Journal
@@ -678,8 +743,8 @@ Création d'entrées du journal alimentaire (liste via **GET** `/api/sante/journ
 
 | Méthode | Chemin                         | Auth | Description |
 | ------- | ------------------------------ | ---- | ----------- |
-| POST    | `/api/ia/recommandations`      | Oui  | Programme d’exercices : script `ia-reco/Ia_recom_mistral_distant.py`. **Body** : `niveau`, `objectif`, `date_debut`, `date_fin`, `valeur_cible`, `unite`, `materiels`, et `biometrie` **ou** `suivi_biometrique` avec `poids_kg`. **`HF_API_TOKEN`** requis. |
-| POST    | `/api/ia/plats`                | Oui  | Plan de repas : script `ia-reco/Ia_recom_mistral_plat_distant.py`. **Body** : `objectif_alimentaire` (`perte_de_poids` \| `prise_de_masse`), `repas_par_jour` (1–3), `restrictions` (liste), optionnel `budget` (1–3 ou libellé), `repas_types` (`dejeuner`, `diner`, `souper`, même taille que `repas_par_jour`). Fichiers d’ingrédients embarqués dans l’image API. **`HF_API_TOKEN`** requis. |
+| POST    | `/api/ia/recommandations`      | Oui  | Programme d’exercices : script `ia-reco/Ia_recom_mistral_distant.py`. **Body** : `niveau`, `objectif`, `date_debut`, `date_fin`, `valeur_cible`, `unite`, `materiels`, et `biometrie` **ou** `suivi_biometrique` avec `poids_kg`. Données : `ref_exercice`, `materiel`, `exercice_materiel` (import script). **`HF_API_TOKEN`** requis. |
+| POST    | `/api/ia/plats`                | Oui  | Plan de repas : script `ia-reco/Ia_recom_mistral_plat_distant.py`. **Body** : `objectif_alimentaire` (`perte_de_poids` \| `prise_de_masse`), `repas_par_jour` (1–3), `restrictions` (liste), optionnel `budget` (1–3 ou libellé), `repas_types` (`dejeuner`, `diner`, `souper`, même taille que `repas_par_jour`). Données : tables `ref_ingredient` / `ref_restriction_*` (import `scripts/import_ia_referentiels_sante.py`). **`HF_API_TOKEN`** requis. |
 
 ---
 

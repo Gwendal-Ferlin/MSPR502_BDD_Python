@@ -19,8 +19,37 @@ CREATE TABLE ref_restriction (
 CREATE TABLE ref_exercice (
     id_exercice SERIAL PRIMARY KEY,
     nom VARCHAR(255) NOT NULL,
-    muscle_principal VARCHAR(255)
+    muscle_principal VARCHAR(255),
+    niveau VARCHAR(20)
 );
+
+-- Catalogue ingrédients IA (ex. final_ingredients_list.json)
+CREATE TABLE ref_ingredient (
+    id_externe VARCHAR(64) PRIMARY KEY,
+    nom TEXT NOT NULL,
+    calories DOUBLE PRECISION,
+    proteines DOUBLE PRECISION,
+    lipides DOUBLE PRECISION,
+    glucides DOUBLE PRECISION,
+    budget SMALLINT NOT NULL CHECK (budget BETWEEN 1 AND 3)
+);
+
+CREATE INDEX idx_ref_ingredient_budget ON ref_ingredient (budget);
+CREATE INDEX idx_ref_ingredient_nom_lower ON ref_ingredient (lower(nom));
+
+-- Équivalences FR/EN pour filtrage IA plats (ex. restrictions_equivalences.json)
+CREATE TABLE ref_restriction_equivalence (
+    cle_canonique VARCHAR(128) PRIMARY KEY
+);
+
+CREATE TABLE ref_restriction_alias (
+    id_alias SERIAL PRIMARY KEY,
+    cle_canonique VARCHAR(128) NOT NULL REFERENCES ref_restriction_equivalence (cle_canonique) ON DELETE CASCADE,
+    alias VARCHAR(255) NOT NULL,
+    UNIQUE (cle_canonique, alias)
+);
+
+CREATE INDEX idx_ref_restriction_alias_lower ON ref_restriction_alias (lower(alias));
 
 CREATE TABLE materiel (
     id_materiel SERIAL PRIMARY KEY,

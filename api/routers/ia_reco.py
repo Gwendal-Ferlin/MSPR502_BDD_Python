@@ -63,8 +63,8 @@ def post_plats(
 ):
     """
     Génère un plan de repas (JSON) via `ia-reco/Ia_recom_mistral_plat_distant.py` (Hugging Face).
-    Nécessite `HF_API_TOKEN` et les fichiers `final_ingredients_list.json` / `restrictions_equivalences.json`
-    dans `ia-reco/` (inclus dans l’image Docker API).
+    Nécessite `HF_API_TOKEN`. Catalogue ingrédients / équivalences restrictions : tables
+    `ref_ingredient`, `ref_restriction_*` (postgres-sante), avec repli sur fichiers `ia-reco/` si import absent.
     """
     try:
         result = ia_generer_plats(body.to_engine_dict())
