@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Environment
+.env
+
+# Logs (conserver le dossier logs/ via .gitkeep)
+logs/*
+!logs/.gitkeep
+*.log
+
+# IDE
+.vscode/
+
+# Generated data
+data/processed/
+
+#sujet
+grille_d_evaluation_MSPR501.txt
+sujet_MSPR501.txt

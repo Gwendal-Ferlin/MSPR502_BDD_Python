@@ -1,0 +1,5 @@
+# voici les dépendances nécessaires pour le projet
+pandas
+openpyxl
+python-dotenv
+psycopg2-binary
