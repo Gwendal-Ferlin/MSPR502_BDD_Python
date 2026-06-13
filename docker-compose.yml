@@ -170,6 +170,31 @@ services:
     networks:
       - mspr502-network
 
+  metabase:
+    image: metabase/metabase:v0.52.8
+    container_name: metabase
+    ports:
+      - "13000:3000"
+    environment:
+      # Adapter l'URL publique (IP TrueNAS ou hostname) — voir METABASE.md
+      MB_SITE_URL: ${METABASE_SITE_URL:-http://localhost:13000}
+    volumes:
+      - metabase_data:/metabase-data
+    depends_on:
+      postgres-sante:
+        condition: service_healthy
+      postgres-utilisateur:
+        condition: service_healthy
+      postgres-gamification:
+        condition: service_healthy
+      mongodb-logs:
+        condition: service_healthy
+      mongodb-reco:
+        condition: service_healthy
+    networks:
+      - mspr502-network
+    restart: unless-stopped
+
   # Logs dans etl/logs/ sur le dataset (creer le dossier avant le 1er run si absent : mkdir -p etl/logs).
   etl:
     build:
@@ -202,3 +227,4 @@ volumes:
   pg_gamification_data:
   mongo_logs_data:
   mongo_reco_data:
+  metabase_data:
