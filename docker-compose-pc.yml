@@ -1,0 +1,233 @@
+services:
+  postgres-utilisateur:
+    image: postgres:16-alpine
+    container_name: postgres-utilisateur
+    environment:
+      POSTGRES_USER: ${POSTGRES_UTILISATEUR_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_UTILISATEUR_PASSWORD}
+      POSTGRES_DB: utilisateur_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_utilisateur_data:/var/lib/postgresql/data
+      - ./init/postgres-utilisateur:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mspr502-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d utilisateur_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  postgres-sante:
+    image: postgres:16-alpine
+    container_name: postgres-sante
+    environment:
+      POSTGRES_USER: ${POSTGRES_SANTE_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_SANTE_PASSWORD}
+      POSTGRES_DB: sante_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_sante_data:/var/lib/postgresql/data
+      - ./init/postgres-sante:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mspr502-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d sante_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  postgres-gamification:
+    image: postgres:16-alpine
+    container_name: postgres-gamification
+    environment:
+      POSTGRES_USER: ${POSTGRES_GAMIFICATION_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_GAMIFICATION_PASSWORD}
+      POSTGRES_DB: gamification_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg_gamification_data:/var/lib/postgresql/data
+      - ./init/postgres-gamification:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mspr502-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d gamification_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  mongodb-logs:
+    image: mongo:7
+    container_name: mongodb-logs
+    environment:
+      MONGO_INITDB_DATABASE: logs_config
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_logs_data:/data/db
+      - ./init/mongodb-logs:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mspr502-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mongodb-reco:
+    image: mongo:7
+    container_name: mongodb-reco
+    environment:
+      MONGO_INITDB_DATABASE: reco
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_reco_data:/data/db
+      - ./init/mongodb-reco:/docker-entrypoint-initdb.d:ro
+    networks:
+      - mspr502-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - mspr502-network
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Surcharges pour le réseau Docker (le .env fournit user/password et le reste)
+      POSTGRES_UTILISATEUR_HOST: postgres-utilisateur
+      POSTGRES_UTILISATEUR_PORT: 5432
+      POSTGRES_SANTE_HOST: postgres-sante
+      POSTGRES_SANTE_PORT: 5432
+      POSTGRES_GAMIFICATION_HOST: postgres-gamification
+      POSTGRES_GAMIFICATION_PORT: 5432
+      MONGODB_LOGS_HOST: mongodb-logs
+      MONGODB_LOGS_PORT: 27017
+      MONGODB_RECO_HOST: mongodb-reco
+      MONGODB_RECO_PORT: 27017
+      MINIO_ENDPOINT: minio:9000
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-mspr502-medias}
+    depends_on:
+      postgres-utilisateur:
+        condition: service_healthy
+      postgres-sante:
+        condition: service_healthy
+      postgres-gamification:
+        condition: service_healthy
+      mongodb-logs:
+        condition: service_healthy
+      mongodb-reco:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    networks:
+      - mspr502-network
+
+  backup:
+    build:
+      context: ./backup
+      dockerfile: Dockerfile
+    container_name: backup
+    env_file:
+      - .env
+    environment:
+      POSTGRES_UTILISATEUR_HOST: postgres-utilisateur
+      POSTGRES_UTILISATEUR_PORT: 5432
+      POSTGRES_UTILISATEUR_USER: ${POSTGRES_UTILISATEUR_USER}
+      POSTGRES_UTILISATEUR_PASSWORD: ${POSTGRES_UTILISATEUR_PASSWORD}
+      POSTGRES_SANTE_HOST: postgres-sante
+      POSTGRES_SANTE_PORT: 5432
+      POSTGRES_SANTE_USER: ${POSTGRES_SANTE_USER}
+      POSTGRES_SANTE_PASSWORD: ${POSTGRES_SANTE_PASSWORD}
+      POSTGRES_GAMIFICATION_HOST: postgres-gamification
+      POSTGRES_GAMIFICATION_PORT: 5432
+      POSTGRES_GAMIFICATION_USER: ${POSTGRES_GAMIFICATION_USER}
+      POSTGRES_GAMIFICATION_PASSWORD: ${POSTGRES_GAMIFICATION_PASSWORD}
+      MONGODB_LOGS_HOST: mongodb-logs
+      MONGODB_LOGS_PORT: 27017
+      MONGODB_RECO_HOST: mongodb-reco
+      MONGODB_RECO_PORT: 27017
+      BACKUP_OUT_DIR: /backups
+      RCLONE_REMOTE: ${RCLONE_REMOTE:-}
+      RCLONE_PATH: ${RCLONE_PATH:-MSPR502/backups}
+    volumes:
+      - ./backups:/backups
+      - ./rclone:/config:ro
+    depends_on:
+      postgres-utilisateur:
+        condition: service_healthy
+      postgres-sante:
+        condition: service_healthy
+      postgres-gamification:
+        condition: service_healthy
+      mongodb-logs:
+        condition: service_healthy
+      mongodb-reco:
+        condition: service_healthy
+    networks:
+      - mspr502-network
+
+  metabase:
+    image: metabase/metabase:v0.49.8
+    container_name: metabase
+    ports:
+      - "${METABASE_PORT:-3000}:3000"
+    environment:
+      MB_JETTY_HOST: 0.0.0.0
+      MB_JETTY_PORT: 3000
+    volumes:
+      - metabase_data:/metabase-data
+    depends_on:
+      postgres-utilisateur:
+        condition: service_healthy
+      postgres-sante:
+        condition: service_healthy
+      postgres-gamification:
+        condition: service_healthy
+    networks:
+      - mspr502-network
+
+networks:
+  mspr502-network:
+    driver: bridge
+
+volumes:
+  pg_utilisateur_data:
+  pg_sante_data:
+  pg_gamification_data:
+  mongo_logs_data:
+  mongo_reco_data:
+  minio_data:
+  metabase_data:

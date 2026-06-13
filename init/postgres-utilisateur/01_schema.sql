@@ -14,7 +14,9 @@ CREATE TABLE compte_utilisateur (
     est_supprime BOOLEAN NOT NULL DEFAULT false,
     date_suppression TIMESTAMPTZ,
     date_fin_periode_payee TIMESTAMPTZ,
-    desabonnement_a_fin_periode BOOLEAN NOT NULL DEFAULT false
+    desabonnement_a_fin_periode BOOLEAN NOT NULL DEFAULT false,
+    nom_affichage VARCHAR(100),
+    photo_profil_url TEXT
 );
 
 CREATE UNIQUE INDEX idx_compte_email_hmac ON compte_utilisateur(email_hmac) WHERE email_hmac IS NOT NULL;
@@ -32,3 +34,38 @@ CREATE TABLE vault_correspondance (
 );
 
 CREATE INDEX idx_vault_id_user ON vault_correspondance(id_user);
+
+-- ==========================================
+-- COMMUNAUTÉ (publications, likes, commentaires)
+-- ==========================================
+
+CREATE TABLE publication (
+    id_publication UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_anonyme UUID NOT NULL,
+    texte TEXT NOT NULL,
+    media_url TEXT,
+    media_type VARCHAR(20) CHECK (media_type IS NULL OR media_type IN ('image', 'video')),
+    date_creation TIMESTAMPTZ NOT NULL DEFAULT now(),
+    est_supprime BOOLEAN NOT NULL DEFAULT false
+);
+
+CREATE INDEX idx_publication_date ON publication (date_creation DESC);
+CREATE INDEX idx_publication_auteur ON publication (id_anonyme);
+
+CREATE TABLE publication_like (
+    id_publication UUID NOT NULL REFERENCES publication (id_publication) ON DELETE CASCADE,
+    id_anonyme UUID NOT NULL,
+    date_creation TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (id_publication, id_anonyme)
+);
+
+CREATE TABLE publication_commentaire (
+    id_commentaire UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_publication UUID NOT NULL REFERENCES publication (id_publication) ON DELETE CASCADE,
+    id_anonyme UUID NOT NULL,
+    texte TEXT NOT NULL,
+    date_creation TIMESTAMPTZ NOT NULL DEFAULT now(),
+    est_supprime BOOLEAN NOT NULL DEFAULT false
+);
+
+CREATE INDEX idx_commentaire_publication ON publication_commentaire (id_publication);

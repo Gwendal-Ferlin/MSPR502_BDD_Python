@@ -13,6 +13,8 @@ class CompteUtilisateurRead(BaseModel):
     est_supprime: bool = False
     date_fin_periode_payee: datetime | None = None
     desabonnement_a_fin_periode: bool = False
+    nom_affichage: str | None = None
+    photo_profil_url: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -41,6 +43,8 @@ class CompteUtilisateurUpdate(BaseModel):
         None,
         description="Si renseigné : mêmes exigences que à l’inscription (RGPD / CNIL).",
     )
+    nom_affichage: str | None = Field(None, max_length=100)
+    photo_profil_url: str | None = None
 
 
 class VaultRead(BaseModel):

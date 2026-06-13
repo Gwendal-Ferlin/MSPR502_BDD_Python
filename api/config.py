@@ -55,6 +55,14 @@ class Settings(BaseSettings):
     rate_limit_default: str = "200/minute"
     rate_limit_login: str = "10/minute"
 
+    # MinIO (stockage médias)
+    minio_endpoint: str = "localhost:9000"
+    minio_public_url: str = "http://localhost:9000"
+    minio_access_key: str = "minioadmin"
+    minio_secret_key: str = "minioadmin"
+    minio_bucket: str = "mspr502-medias"
+    minio_secure: bool = False
+
     model_config = {
         "env_file": str(_REPO_ROOT / ".env"),
         "env_file_encoding": "utf-8",

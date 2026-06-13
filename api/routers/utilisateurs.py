@@ -20,6 +20,7 @@ from api.schemas.utilisateurs import (
     CompteUtilisateurUpdate,
     SouscrireAbonnement,
 )
+from api.schemas.social import ProfilPublicRead
 from api.services.log_admin import log_admin_consultation_tiers, log_admin_suppression_utilisateur_tiers
 from api.services import field_encryption as fe
 from api.services import password_policy
@@ -30,7 +31,7 @@ AdminOrSuperAdmin = Annotated[CurrentUser, Depends(require_roles(["Admin", "Supe
 
 SELECT_COMPTE_COLS = (
     "id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime, "
-    "date_fin_periode_payee, desabonnement_a_fin_periode"
+    "date_fin_periode_payee, desabonnement_a_fin_periode, nom_affichage, photo_profil_url"
 )
 ABONNEMENT_DUREE_MOIS = 1
 
@@ -240,6 +241,14 @@ def modifier_mon_compte(
         updates.append("password = :password")
         params["password"] = fe.persist_password_only(hashed_pw)
 
+    if body.nom_affichage is not None:
+        updates.append("nom_affichage = :nom_affichage")
+        params["nom_affichage"] = body.nom_affichage.strip() or None
+
+    if body.photo_profil_url is not None:
+        updates.append("photo_profil_url = :photo_profil_url")
+        params["photo_profil_url"] = body.photo_profil_url.strip() or None
+
     if not updates:
         _appliquer_fin_periode_si_necessaire(db, id_user)
         row = db.execute(
@@ -328,6 +337,29 @@ def desabonner(
         {"id": id_user},
     ).fetchone()
     return CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(r._mapping)))
+
+
+@router.get("/public/{id_anonyme}", response_model=ProfilPublicRead)
+def get_profil_public(
+    id_anonyme: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    db: Session = Depends(get_session_utilisateur),
+):
+    """Informations publiques d'un utilisateur (auteur de publication, etc.)."""
+    row = db.execute(
+        text(
+            """
+            SELECT v.id_anonyme, cu.nom_affichage, cu.photo_profil_url
+            FROM vault_correspondance v
+            JOIN compte_utilisateur cu ON cu.id_user = v.id_user
+            WHERE v.id_anonyme = :id AND COALESCE(cu.est_supprime, false) = false
+            """
+        ),
+        {"id": str(id_anonyme)},
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur non trouvé")
+    return ProfilPublicRead.model_validate(dict(row._mapping))
 
 
 @router.delete("/{id_user}", status_code=status.HTTP_204_NO_CONTENT)

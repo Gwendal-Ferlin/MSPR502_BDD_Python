@@ -16,6 +16,8 @@ from api.routers import (
     gamification,
     ia_reco,
     ia_referentiels_public,
+    medias,
+    publications,
 )
 
 app = FastAPI(
@@ -45,6 +47,8 @@ app.include_router(reco.router, prefix="/api")
 app.include_router(gamification.router, prefix="/api")
 app.include_router(ia_reco.router, prefix="/api")
 app.include_router(ia_referentiels_public.router, prefix="/api")
+app.include_router(medias.router, prefix="/api")
+app.include_router(publications.router, prefix="/api")
 
 
 @app.get("/")
