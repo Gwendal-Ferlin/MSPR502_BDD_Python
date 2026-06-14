@@ -39,6 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       has_dockerhub_secrets: ${{ steps.check.outputs.has_dockerhub_secrets }}
+      has_sonar_secrets: ${{ steps.check.outputs.has_sonar_secrets }}
     steps:
       - id: check
         run: |
@@ -47,6 +48,13 @@ jobs:
           else
             echo "has_dockerhub_secrets=false" >> $GITHUB_OUTPUT
           fi
+
+          if [ -n "${{ secrets.SONAR_TOKEN }}" ]; then
+            echo "has_sonar_secrets=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_sonar_secrets=false" >> $GITHUB_OUTPUT
+          fi
+
 
 
   # ───────────────────────────────────────────────────────────────────────────
@@ -310,6 +318,26 @@ jobs:
           name: trivy-security-report
           path: trivy-report.txt
           retention-days: 30
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 5.5 SONARQUBE SCAN — Analyse de la qualité du code
+  # ───────────────────────────────────────────────────────────────────────────
+  sonarqube:
+    name: "📊 SonarQube Scan"
+    runs-on: ubuntu-latest
+    needs: [check-secrets, lint]
+    if: needs.check-secrets.outputs.has_sonar_secrets == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Recommandé par SonarQube pour avoir l'historique complet git
+
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}  # Utile si hébergé sur un serveur privé, sinon ignoré pour SonarCloud
 
   # ───────────────────────────────────────────────────────────────────────────
   # 6. PUSH IMAGE — uniquement sur main après succès complet
