@@ -337,7 +337,6 @@ jobs:
         uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}  # Utile si hébergé sur un serveur privé, sinon ignoré pour SonarCloud
 
   # ───────────────────────────────────────────────────────────────────────────
   # 6. PUSH IMAGE — uniquement sur main après succès complet
