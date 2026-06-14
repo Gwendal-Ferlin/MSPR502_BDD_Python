@@ -1,7 +1,5 @@
 """Référentiels IA (exercices, ingrédients, équivalences restrictions) — accès public."""
 
-from typing import Annotated
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session

@@ -134,7 +134,7 @@ def load_ingredients_by_budget(
             return None
         rows = session.execute(
             text(
-                f"""
+                """
                 SELECT DISTINCT ON (lower(nom))
                     nom, budget, calories, proteines, glucides, lipides
                 FROM ref_ingredient

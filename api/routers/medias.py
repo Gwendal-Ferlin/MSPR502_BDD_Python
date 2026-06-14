@@ -1,10 +1,8 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, UploadFile, status
-from sqlalchemy.orm import Session
 
 from api.auth.dependencies import get_current_user
-from api.db.postgres_utilisateur import get_session_utilisateur
 from api.schemas.auth import CurrentUser
 from api.schemas.social import MediaUploadResponse
 from api.services.minio_storage import upload_media

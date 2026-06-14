@@ -282,7 +282,7 @@ def souscrire_abonnement(
     """Souscrit à Premium ou Premium+ (mock paiement : pas de vrai paiement, période fixe 1 mois)."""
     id_user = current_user.id_user
     row = db.execute(
-        text(f"SELECT id_user FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
+        text("SELECT id_user FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
         {"id": id_user},
     ).fetchone()
     if not row:
@@ -312,7 +312,7 @@ def desabonner(
     """Demande à ne pas renouveler : l'abonnement reste actif jusqu'à date_fin_periode_payee."""
     id_user = current_user.id_user
     row = db.execute(
-        text(f"SELECT type_abonnement, desabonnement_a_fin_periode FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
+        text("SELECT type_abonnement, desabonnement_a_fin_periode FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
         {"id": id_user},
     ).fetchone()
     if not row:
