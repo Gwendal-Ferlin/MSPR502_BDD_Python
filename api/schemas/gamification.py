@@ -39,4 +39,3 @@ class AddCoinsRequest(BaseModel):
     amount: int = Field(gt=0)
     reason: str | None = None
     metadata: dict[str, Any] | None = None
-

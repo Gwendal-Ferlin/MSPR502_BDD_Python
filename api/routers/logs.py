@@ -27,7 +27,10 @@ def list_evenements(
         if id_anonyme:
             q["id_anonyme"] = id_anonyme
             log_admin_consultation_tiers(
-                db, current_user, "GET /api/logs/evenements", id_anonyme_cible=id_anonyme
+                db,
+                current_user,
+                "GET /api/logs/evenements",
+                id_anonyme_cible=id_anonyme,
             )
     else:
         q["id_anonyme"] = current_user.id_anonyme
@@ -71,7 +74,13 @@ def list_config(db: Database = Depends(get_mongo_logs)):
     coll = db["config"]
     out = []
     for doc in coll.find():
-        out.append(ConfigRead(cle=doc.get("cle", ""), valeur=doc.get("valeur"), description=doc.get("description")))
+        out.append(
+            ConfigRead(
+                cle=doc.get("cle", ""),
+                valeur=doc.get("valeur"),
+                description=doc.get("description"),
+            )
+        )
     return out
 
 
@@ -80,4 +89,8 @@ def get_config(cle: str, db: Database = Depends(get_mongo_logs)):
     doc = db["config"].find_one({"cle": cle})
     if not doc:
         return None
-    return {"cle": doc["cle"], "valeur": doc.get("valeur"), "description": doc.get("description")}
+    return {
+        "cle": doc["cle"],
+        "valeur": doc.get("valeur"),
+        "description": doc.get("description"),
+    }

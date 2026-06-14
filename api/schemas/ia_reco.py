@@ -41,7 +41,9 @@ class IaRecommandationRequest(BaseModel):
     )
     date_debut: str = Field(..., description="Date ISO 8601 (début de période)")
     date_fin: str = Field(..., description="Date ISO 8601 (fin de période)")
-    valeur_cible: float = Field(..., description="Poids cible en kg (cohérent avec l'objectif)")
+    valeur_cible: float = Field(
+        ..., description="Poids cible en kg (cohérent avec l'objectif)"
+    )
     unite: str = Field(default="kg", description="Doit être `kg`")
     materiels: list[str] = Field(
         ...,

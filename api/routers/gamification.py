@@ -26,7 +26,9 @@ from api.schemas.gamification import (
 
 router = APIRouter(prefix="/gamification", tags=["Gamification"])
 
-AdminOrSuperAdmin = Annotated[CurrentUser, Depends(require_roles(["Admin", "Super-Admin"]))]
+AdminOrSuperAdmin = Annotated[
+    CurrentUser, Depends(require_roles(["Admin", "Super-Admin"]))
+]
 
 
 def _now_utc() -> datetime:
@@ -34,7 +36,9 @@ def _now_utc() -> datetime:
 
 
 def _optional_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(HTTPBearer(auto_error=False))],
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None, Depends(HTTPBearer(auto_error=False))
+    ],
 ) -> CurrentUser | None:
     if not credentials or not credentials.credentials:
         return None
@@ -51,7 +55,9 @@ def _optional_current_user(
         id_anonyme = payload.get("id_anonyme")
         if id_user is None or email is None or role is None or id_anonyme is None:
             return None
-        return CurrentUser(id_user=id_user, email=email, role=role, id_anonyme=id_anonyme)
+        return CurrentUser(
+            id_user=id_user, email=email, role=role, id_anonyme=id_anonyme
+        )
     except JWTError:
         return None
 
@@ -155,7 +161,9 @@ def get_inventory(
     )
 
 
-@router.post("/animals/buy", response_model=ApiResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/animals/buy", response_model=ApiResponse, status_code=status.HTTP_201_CREATED
+)
 def buy_animal(
     body: BuyAnimalRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
@@ -312,7 +320,9 @@ def buy_animal(
         raise
 
 
-@router.post("/chromas/buy", response_model=ApiResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/chromas/buy", response_model=ApiResponse, status_code=status.HTTP_201_CREATED
+)
 def buy_chroma(
     body: BuyChromaRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
@@ -436,7 +446,12 @@ def buy_chroma(
                 RETURNING id
                 """
             ),
-            {"uid": str(user_id), "amount": cfg_price, "animal_id": animal_id, "chroma_id": chroma_id},
+            {
+                "uid": str(user_id),
+                "amount": cfg_price,
+                "animal_id": animal_id,
+                "chroma_id": chroma_id,
+            },
         ).fetchone()
 
         remaining = db.execute(
@@ -532,7 +547,9 @@ def toggle_visibility(
     return ApiResponse(success=True, data=dict(updated._mapping))
 
 
-@router.post("/coins/add", response_model=ApiResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/coins/add", response_model=ApiResponse, status_code=status.HTTP_201_CREATED
+)
 def add_coins(
     body: AddCoinsRequest,
     _: AdminOrSuperAdmin,
@@ -591,7 +608,13 @@ def add_coins(
                 RETURNING id
                 """
             ),
-            {"uid": str(user_id), "amount": amount, "metadata": None if metadata is None else str(metadata).replace("'", '"')},
+            {
+                "uid": str(user_id),
+                "amount": amount,
+                "metadata": None
+                if metadata is None
+                else str(metadata).replace("'", '"'),
+            },
         ).fetchone()
 
         coins_row = db.execute(
@@ -623,27 +646,43 @@ def get_stats(
     user_id = UUID(current_user.id_anonyme)
     currency = _ensure_currency_row(db, user_id)
 
-    total_animals = db.execute(
-        text("SELECT COUNT(*) AS c FROM gamification_user_inventory WHERE user_id = :uid"),
-        {"uid": str(user_id)},
-    ).fetchone()._mapping["c"]
+    total_animals = (
+        db.execute(
+            text(
+                "SELECT COUNT(*) AS c FROM gamification_user_inventory WHERE user_id = :uid"
+            ),
+            {"uid": str(user_id)},
+        )
+        .fetchone()
+        ._mapping["c"]
+    )
 
-    rare_or_better = db.execute(
-        text(
-            """
+    rare_or_better = (
+        db.execute(
+            text(
+                """
             SELECT COUNT(*) AS c
             FROM gamification_user_inventory i
             JOIN gamification_animals_config a ON a.animal_id = i.animal_id
             WHERE i.user_id = :uid
               AND a.rarity IN ('rare', 'epic', 'legendary')
             """
-        ),
-        {"uid": str(user_id)},
-    ).fetchone()._mapping["c"]
+            ),
+            {"uid": str(user_id)},
+        )
+        .fetchone()
+        ._mapping["c"]
+    )
 
-    available_total = db.execute(
-        text("SELECT COUNT(*) AS c FROM gamification_animals_config WHERE is_available = true"),
-    ).fetchone()._mapping["c"]
+    available_total = (
+        db.execute(
+            text(
+                "SELECT COUNT(*) AS c FROM gamification_animals_config WHERE is_available = true"
+            ),
+        )
+        .fetchone()
+        ._mapping["c"]
+    )
 
     completion = 0.0
     if int(available_total) > 0:
@@ -728,7 +767,11 @@ def animals_catalog(
         a = dict(r._mapping)
         animal_id = a["animal_id"]
         owned = animal_id in inv_by_animal
-        active = inv_by_animal.get(animal_id, {}).get("active_chroma_id", "default") if owned else None
+        active = (
+            inv_by_animal.get(animal_id, {}).get("active_chroma_id", "default")
+            if owned
+            else None
+        )
 
         owned_list = sorted(list(owned_chromas.get(animal_id, set())))
         if owned and "default" not in owned_chromas.get(animal_id, set()):
@@ -758,7 +801,10 @@ def animals_catalog(
                     "chroma_id": cid,
                     "name": c["name"],
                     "price": int(c["price"]),
-                    "owned": owned and (cid in owned_chromas.get(animal_id, set()) or cid == "default"),
+                    "owned": owned
+                    and (
+                        cid in owned_chromas.get(animal_id, set()) or cid == "default"
+                    ),
                     "active": owned and active == cid,
                 }
             )
@@ -779,4 +825,3 @@ def animals_catalog(
         )
 
     return ApiResponse(success=True, data={"animals": out_animals})
-

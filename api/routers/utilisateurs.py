@@ -21,13 +21,18 @@ from api.schemas.utilisateurs import (
     SouscrireAbonnement,
 )
 from api.schemas.social import ProfilPublicRead
-from api.services.log_admin import log_admin_consultation_tiers, log_admin_suppression_utilisateur_tiers
+from api.services.log_admin import (
+    log_admin_consultation_tiers,
+    log_admin_suppression_utilisateur_tiers,
+)
 from api.services import field_encryption as fe
 from api.services import password_policy
 
 router = APIRouter(prefix="/utilisateurs", tags=["Utilisateurs"])
 
-AdminOrSuperAdmin = Annotated[CurrentUser, Depends(require_roles(["Admin", "Super-Admin"]))]
+AdminOrSuperAdmin = Annotated[
+    CurrentUser, Depends(require_roles(["Admin", "Super-Admin"]))
+]
 
 SELECT_COMPTE_COLS = (
     "id_user, email, role, type_abonnement, date_consentement_rgpd, est_supprime, "
@@ -63,7 +68,9 @@ def _appliquer_fin_periode_tous(db: Session) -> None:
     db.commit()
 
 
-@router.post("", response_model=CompteUtilisateurRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=CompteUtilisateurRead, status_code=status.HTTP_201_CREATED
+)
 def create_compte(
     body: CompteUtilisateurCreate,
     db: Session = Depends(get_session_utilisateur),
@@ -72,7 +79,9 @@ def create_compte(
     email = body.email.strip().lower()
     # 1. Vérifier si l'email existe déjà
     existing = db.execute(
-        text(f"SELECT id_user FROM compte_utilisateur WHERE {fe.sql_email_match_clause()}"),
+        text(
+            f"SELECT id_user FROM compte_utilisateur WHERE {fe.sql_email_match_clause()}"
+        ),
         fe.params_for_email_lookup(email),
     ).fetchone()
     if existing:
@@ -89,7 +98,9 @@ def create_compte(
         )
 
     # 2. Hasher le mot de passe
-    hashed_pw = bcrypt.hashpw(body.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    hashed_pw = bcrypt.hashpw(body.password.encode("utf-8"), bcrypt.gensalt()).decode(
+        "utf-8"
+    )
     email_db, email_hmac, pwd_db = fe.persist_compte_email_password(email, hashed_pw)
 
     # 3. Créer le compte (Role: Client, Abonnement: Freemium)
@@ -112,7 +123,7 @@ def create_compte(
     # 4. Créer l'entrée dans le vault pour le lien anonymisé
     db.execute(
         text("INSERT INTO vault_correspondance (id_user) VALUES (:id_user)"),
-        {"id_user": new_user["id_user"]}
+        {"id_user": new_user["id_user"]},
     )
 
     vault_row = db.execute(
@@ -172,13 +183,21 @@ def list_comptes(
     db_logs: Database = Depends(get_mongo_logs),
 ):
     log_admin_consultation_tiers(
-        db_logs, current_user, "GET /api/utilisateurs", details_extra={"liste_complete": True}
+        db_logs,
+        current_user,
+        "GET /api/utilisateurs",
+        details_extra={"liste_complete": True},
     )
     _appliquer_fin_periode_tous(db)
     rows = db.execute(
-        text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE COALESCE(est_supprime, false) = false")
+        text(
+            f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE COALESCE(est_supprime, false) = false"
+        )
     ).fetchall()
-    return [CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(r._mapping))) for r in rows]
+    return [
+        CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(r._mapping)))
+        for r in rows
+    ]
 
 
 @router.get("/me", response_model=CompteUtilisateurRead)
@@ -189,12 +208,18 @@ def get_mon_compte(
     """Retourne le compte de l'utilisateur connecté."""
     _appliquer_fin_periode_si_necessaire(db, current_user.id_user)
     row = db.execute(
-        text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
+        text(
+            f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"
+        ),
         {"id": current_user.id_user},
     ).fetchone()
     if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé")
-    return CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(row._mapping)))
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé"
+        )
+    return CompteUtilisateurRead.model_validate(
+        fe.decrypt_compte_row(dict(row._mapping))
+    )
 
 
 @router.patch("/me", response_model=CompteUtilisateurRead)
@@ -228,7 +253,9 @@ def modifier_mon_compte(
         effective_email = (
             body.email.strip().lower() if body.email is not None else current_user.email
         )
-        pwd_errors = password_policy.validate_password_rgpd(body.password, effective_email)
+        pwd_errors = password_policy.validate_password_rgpd(
+            body.password, effective_email
+        )
         if pwd_errors:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -237,7 +264,9 @@ def modifier_mon_compte(
                     "exigences": pwd_errors,
                 },
             )
-        hashed_pw = bcrypt.hashpw(body.password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        hashed_pw = bcrypt.hashpw(
+            body.password.encode("utf-8"), bcrypt.gensalt()
+        ).decode("utf-8")
         updates.append("password = :password")
         params["password"] = fe.persist_password_only(hashed_pw)
 
@@ -252,12 +281,18 @@ def modifier_mon_compte(
     if not updates:
         _appliquer_fin_periode_si_necessaire(db, id_user)
         row = db.execute(
-            text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"),
+            text(
+                f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"
+            ),
             {"id": id_user},
         ).fetchone()
         if not row:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé")
-        return CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(row._mapping)))
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé"
+            )
+        return CompteUtilisateurRead.model_validate(
+            fe.decrypt_compte_row(dict(row._mapping))
+        )
 
     set_clause = ", ".join(updates)
     db.execute(
@@ -267,10 +302,14 @@ def modifier_mon_compte(
     db.commit()
     _appliquer_fin_periode_si_necessaire(db, id_user)
     row = db.execute(
-        text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"),
+        text(
+            f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"
+        ),
         {"id": id_user},
     ).fetchone()
-    return CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(row._mapping)))
+    return CompteUtilisateurRead.model_validate(
+        fe.decrypt_compte_row(dict(row._mapping))
+    )
 
 
 @router.post("/me/abonnement/souscrire", response_model=CompteUtilisateurRead)
@@ -282,11 +321,15 @@ def souscrire_abonnement(
     """Souscrit à Premium ou Premium+ (mock paiement : pas de vrai paiement, période fixe 1 mois)."""
     id_user = current_user.id_user
     row = db.execute(
-        text("SELECT id_user FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
+        text(
+            "SELECT id_user FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"
+        ),
         {"id": id_user},
     ).fetchone()
     if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé"
+        )
     date_fin = datetime.now(timezone.utc) + timedelta(days=30 * ABONNEMENT_DUREE_MOIS)
     db.execute(
         text("""
@@ -298,10 +341,14 @@ def souscrire_abonnement(
     )
     db.commit()
     row = db.execute(
-        text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"),
+        text(
+            f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"
+        ),
         {"id": id_user},
     ).fetchone()
-    return CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(row._mapping)))
+    return CompteUtilisateurRead.model_validate(
+        fe.decrypt_compte_row(dict(row._mapping))
+    )
 
 
 @router.post("/me/abonnement/desabonner", response_model=CompteUtilisateurRead)
@@ -312,28 +359,42 @@ def desabonner(
     """Demande à ne pas renouveler : l'abonnement reste actif jusqu'à date_fin_periode_payee."""
     id_user = current_user.id_user
     row = db.execute(
-        text("SELECT type_abonnement, desabonnement_a_fin_periode FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
+        text(
+            "SELECT type_abonnement, desabonnement_a_fin_periode FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"
+        ),
         {"id": id_user},
     ).fetchone()
     if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé"
+        )
     if row.type_abonnement == "Freemium":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Compte déjà en Freemium")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Compte déjà en Freemium"
+        )
     if row.desabonnement_a_fin_periode:
         # Idempotent : déjà désabonné à fin de période
         r = db.execute(
-            text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"),
+            text(
+                f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"
+            ),
             {"id": id_user},
         ).fetchone()
-        return CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(r._mapping)))
+        return CompteUtilisateurRead.model_validate(
+            fe.decrypt_compte_row(dict(r._mapping))
+        )
     db.execute(
-        text("UPDATE compte_utilisateur SET desabonnement_a_fin_periode = true WHERE id_user = :id"),
+        text(
+            "UPDATE compte_utilisateur SET desabonnement_a_fin_periode = true WHERE id_user = :id"
+        ),
         {"id": id_user},
     )
     db.commit()
     _appliquer_fin_periode_si_necessaire(db, id_user)
     r = db.execute(
-        text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"),
+        text(
+            f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id"
+        ),
         {"id": id_user},
     ).fetchone()
     return CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(r._mapping)))
@@ -358,7 +419,9 @@ def get_profil_public(
         {"id": str(id_anonyme)},
     ).fetchone()
     if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur non trouvé")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur non trouvé"
+        )
     return ProfilPublicRead.model_validate(dict(row._mapping))
 
 
@@ -370,19 +433,34 @@ def supprimer_compte(
     db_logs: Database = Depends(get_mongo_logs),
 ):
     """Suppression logique (est_supprime=true). Le client peut se supprimer lui-même ; un Admin/Super-Admin peut supprimer tout compte. Les suppressions par un admin sur un tiers sont loguées."""
-    if current_user.role not in ("Admin", "Super-Admin") and current_user.id_user != id_user:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants")
+    if (
+        current_user.role not in ("Admin", "Super-Admin")
+        and current_user.id_user != id_user
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants"
+        )
 
     row = db.execute(
-        text("SELECT id_user FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
+        text(
+            "SELECT id_user FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"
+        ),
         {"id": id_user},
     ).fetchone()
     if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Compte non trouvé"
+        )
 
-    if current_user.role in ("Admin", "Super-Admin") and current_user.id_user != id_user:
+    if (
+        current_user.role in ("Admin", "Super-Admin")
+        and current_user.id_user != id_user
+    ):
         log_admin_suppression_utilisateur_tiers(
-            db_logs, current_user, "DELETE /api/utilisateurs/{id_user}", id_user_cible=id_user
+            db_logs,
+            current_user,
+            "DELETE /api/utilisateurs/{id_user}",
+            id_user_cible=id_user,
         )
 
     db.execute(
@@ -402,19 +480,28 @@ def get_compte(
     db: Session = Depends(get_session_utilisateur),
     db_logs: Database = Depends(get_mongo_logs),
 ):
-    if current_user.role not in ("Admin", "Super-Admin") and current_user.id_user != id_user:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants")
+    if (
+        current_user.role not in ("Admin", "Super-Admin")
+        and current_user.id_user != id_user
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants"
+        )
     log_admin_consultation_tiers(
         db_logs, current_user, "GET /api/utilisateurs/{id_user}", id_user_cible=id_user
     )
     _appliquer_fin_periode_si_necessaire(db, id_user)
     row = db.execute(
-        text(f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"),
+        text(
+            f"SELECT {SELECT_COMPTE_COLS} FROM compte_utilisateur WHERE id_user = :id AND COALESCE(est_supprime, false) = false"
+        ),
         {"id": id_user},
     ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Compte non trouvé")
-    return CompteUtilisateurRead.model_validate(fe.decrypt_compte_row(dict(row._mapping)))
+    return CompteUtilisateurRead.model_validate(
+        fe.decrypt_compte_row(dict(row._mapping))
+    )
 
 
 @router.get("/{id_user}/vault", response_model=VaultRead)
@@ -424,17 +511,29 @@ def get_vault_by_user(
     db: Session = Depends(get_session_utilisateur),
     db_logs: Database = Depends(get_mongo_logs),
 ):
-    if current_user.role not in ("Admin", "Super-Admin") and current_user.id_user != id_user:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants")
+    if (
+        current_user.role not in ("Admin", "Super-Admin")
+        and current_user.id_user != id_user
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants"
+        )
     log_admin_consultation_tiers(
-        db_logs, current_user, "GET /api/utilisateurs/{id_user}/vault", id_user_cible=id_user
+        db_logs,
+        current_user,
+        "GET /api/utilisateurs/{id_user}/vault",
+        id_user_cible=id_user,
     )
     row = db.execute(
-        text("SELECT id_anonyme, id_user, date_derniere_activite, consentement_sante_actif FROM vault_correspondance WHERE id_user = :id"),
+        text(
+            "SELECT id_anonyme, id_user, date_derniere_activite, consentement_sante_actif FROM vault_correspondance WHERE id_user = :id"
+        ),
         {"id": id_user},
     ).fetchone()
     if not row:
-        raise HTTPException(status_code=404, detail="Vault non trouvé pour cet utilisateur")
+        raise HTTPException(
+            status_code=404, detail="Vault non trouvé pour cet utilisateur"
+        )
     return VaultRead.model_validate(dict(row._mapping))
 
 
@@ -446,13 +545,23 @@ def get_vault_by_anonyme(
     db_logs: Database = Depends(get_mongo_logs),
 ):
     id_anonyme_str = str(id_anonyme)
-    if current_user.role not in ("Admin", "Super-Admin") and current_user.id_anonyme != id_anonyme_str:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants")
+    if (
+        current_user.role not in ("Admin", "Super-Admin")
+        and current_user.id_anonyme != id_anonyme_str
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants"
+        )
     log_admin_consultation_tiers(
-        db_logs, current_user, "GET /api/utilisateurs/vault/{id_anonyme}", id_anonyme_cible=id_anonyme_str
+        db_logs,
+        current_user,
+        "GET /api/utilisateurs/vault/{id_anonyme}",
+        id_anonyme_cible=id_anonyme_str,
     )
     row = db.execute(
-        text("SELECT id_anonyme, id_user, date_derniere_activite, consentement_sante_actif FROM vault_correspondance WHERE id_anonyme = :id"),
+        text(
+            "SELECT id_anonyme, id_user, date_derniere_activite, consentement_sante_actif FROM vault_correspondance WHERE id_anonyme = :id"
+        ),
         {"id": id_anonyme_str},
     ).fetchone()
     if not row:

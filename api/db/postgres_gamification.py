@@ -17,4 +17,3 @@ def get_session_gamification() -> Session:
         yield session
     finally:
         session.close()
-

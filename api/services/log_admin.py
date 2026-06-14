@@ -37,13 +37,15 @@ def log_admin_consultation_tiers(
         details.update(details_extra)
 
     coll = db_logs["evenements"]
-    coll.insert_one({
-        "id_log": f"log-{uuid.uuid4().hex[:12]}",
-        "timestamp": datetime.now(timezone.utc),
-        "id_anonyme": current_user.id_anonyme,
-        "action": "consultation_donnees_tiers",
-        "details_techniques": details,
-    })
+    coll.insert_one(
+        {
+            "id_log": f"log-{uuid.uuid4().hex[:12]}",
+            "timestamp": datetime.now(timezone.utc),
+            "id_anonyme": current_user.id_anonyme,
+            "action": "consultation_donnees_tiers",
+            "details_techniques": details,
+        }
+    )
 
 
 def log_admin_suppression_utilisateur_tiers(
@@ -66,10 +68,12 @@ def log_admin_suppression_utilisateur_tiers(
     }
 
     coll = db_logs["evenements"]
-    coll.insert_one({
-        "id_log": f"log-{uuid.uuid4().hex[:12]}",
-        "timestamp": datetime.now(timezone.utc),
-        "id_anonyme": current_user.id_anonyme,
-        "action": "suppression_utilisateur_tiers",
-        "details_techniques": details,
-    })
+    coll.insert_one(
+        {
+            "id_log": f"log-{uuid.uuid4().hex[:12]}",
+            "timestamp": datetime.now(timezone.utc),
+            "id_anonyme": current_user.id_anonyme,
+            "action": "suppression_utilisateur_tiers",
+            "details_techniques": details,
+        }
+    )

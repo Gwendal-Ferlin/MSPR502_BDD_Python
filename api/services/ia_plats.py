@@ -13,7 +13,11 @@ def _resolve_script_path() -> Path:
     docker_path = Path("/app/ia-reco/Ia_recom_mistral_plat_distant.py")
     if docker_path.is_file():
         return docker_path
-    local = Path(__file__).resolve().parents[2] / "ia-reco" / "Ia_recom_mistral_plat_distant.py"
+    local = (
+        Path(__file__).resolve().parents[2]
+        / "ia-reco"
+        / "Ia_recom_mistral_plat_distant.py"
+    )
     if local.is_file():
         return local
     raise FileNotFoundError(

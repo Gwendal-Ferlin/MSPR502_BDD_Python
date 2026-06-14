@@ -40,8 +40,13 @@ class IaPlatsRequest(BaseModel):
 
     @model_validator(mode="after")
     def repas_types_match_count(self):
-        if self.repas_types is not None and len(self.repas_types) != self.repas_par_jour:
-            raise ValueError("repas_types doit avoir la même longueur que repas_par_jour")
+        if (
+            self.repas_types is not None
+            and len(self.repas_types) != self.repas_par_jour
+        ):
+            raise ValueError(
+                "repas_types doit avoir la même longueur que repas_par_jour"
+            )
         return self
 
     def to_engine_dict(self) -> dict:

@@ -10,7 +10,9 @@ from api.services.minio_storage import upload_media
 router = APIRouter(prefix="/medias", tags=["Médias"])
 
 
-@router.post("/upload", response_model=MediaUploadResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/upload", response_model=MediaUploadResponse, status_code=status.HTTP_201_CREATED
+)
 async def upload_fichier(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     fichier: UploadFile = File(...),

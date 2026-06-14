@@ -80,7 +80,9 @@ def reward_coins_repas_created(
         ).fetchone()
 
         coins_row = db.execute(
-            text("SELECT id, coins FROM gamification_user_currency WHERE user_id = :uid"),
+            text(
+                "SELECT id, coins FROM gamification_user_currency WHERE user_id = :uid"
+            ),
             {"uid": uid},
         ).fetchone()
 

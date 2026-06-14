@@ -21,6 +21,7 @@ class CompteUtilisateurRead(BaseModel):
 
 class SouscrireAbonnement(BaseModel):
     """Body pour souscrire à Premium ou Premium+ (mock paiement)."""
+
     type_abonnement: Literal["Premium", "Premium+"]
 
 
@@ -38,6 +39,7 @@ class CompteUtilisateurCreate(BaseModel):
 
 class CompteUtilisateurUpdate(BaseModel):
     """Champs modifiables par l'utilisateur sur son propre compte (email, mot de passe)."""
+
     email: str | None = None
     password: str | None = Field(
         None,

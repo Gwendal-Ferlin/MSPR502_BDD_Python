@@ -36,7 +36,9 @@ def _check_id_anonyme(current_user: CurrentUser, id_anonyme: str | None) -> str 
     if current_user.role in ("Admin", "Super-Admin"):
         return id_anonyme
     if id_anonyme and id_anonyme != current_user.id_anonyme:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants"
+        )
     return current_user.id_anonyme
 
 
@@ -53,15 +55,27 @@ def list_profils(
             db_logs, current_user, "GET /api/sante/profils", id_anonyme_cible=effective
         )
         rows = db.execute(
-            text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante WHERE id_anonyme = :id"),
+            text(
+                "SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante WHERE id_anonyme = :id"
+            ),
             {"id": effective},
         ).fetchall()
     else:
         log_admin_consultation_tiers(
-            db_logs, current_user, "GET /api/sante/profils", details_extra={"liste_complete": True}
+            db_logs,
+            current_user,
+            "GET /api/sante/profils",
+            details_extra={"liste_complete": True},
         )
-        rows = db.execute(text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante")).fetchall()
-    return [ProfilSanteRead.model_validate(fe.decrypt_profil_row(dict(r._mapping))) for r in rows]
+        rows = db.execute(
+            text(
+                "SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante"
+            )
+        ).fetchall()
+    return [
+        ProfilSanteRead.model_validate(fe.decrypt_profil_row(dict(r._mapping)))
+        for r in rows
+    ]
 
 
 @router.patch("/profils", response_model=ProfilSanteRead)
@@ -94,17 +108,23 @@ def modifier_mon_profil(
     if not updates:
         if row:
             r = db.execute(
-                text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante WHERE id_anonyme = :id"),
+                text(
+                    "SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante WHERE id_anonyme = :id"
+                ),
                 {"id": id_anonyme},
             ).fetchone()
-            return ProfilSanteRead.model_validate(fe.decrypt_profil_row(dict(r._mapping)))
+            return ProfilSanteRead.model_validate(
+                fe.decrypt_profil_row(dict(r._mapping))
+            )
         db.execute(
             text("INSERT INTO profil_sante (id_anonyme) VALUES (:id)"),
             {"id": id_anonyme},
         )
         db.commit()
         r = db.execute(
-            text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante WHERE id_anonyme = :id"),
+            text(
+                "SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante WHERE id_anonyme = :id"
+            ),
             {"id": id_anonyme},
         ).fetchone()
         return ProfilSanteRead.model_validate(fe.decrypt_profil_row(dict(r._mapping)))
@@ -122,15 +142,25 @@ def modifier_mon_profil(
         taille = params.get("taille_cm")
         niveau = params.get("niveau_activite")
         ins = fe.encrypt_profil_params(
-            {"id": id_anonyme, "annee_naissance": annee, "sexe": sexe, "taille_cm": taille, "niveau_activite": niveau}
+            {
+                "id": id_anonyme,
+                "annee_naissance": annee,
+                "sexe": sexe,
+                "taille_cm": taille,
+                "niveau_activite": niveau,
+            }
         )
         db.execute(
-            text("INSERT INTO profil_sante (id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite) VALUES (:id, :annee_naissance, :sexe, :taille_cm, :niveau_activite)"),
+            text(
+                "INSERT INTO profil_sante (id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite) VALUES (:id, :annee_naissance, :sexe, :taille_cm, :niveau_activite)"
+            ),
             ins,
         )
     db.commit()
     r = db.execute(
-        text("SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante WHERE id_anonyme = :id"),
+        text(
+            "SELECT id_profil, id_anonyme, annee_naissance, sexe, taille_cm, niveau_activite FROM profil_sante WHERE id_anonyme = :id"
+        ),
         {"id": id_anonyme},
     ).fetchone()
     return ProfilSanteRead.model_validate(fe.decrypt_profil_row(dict(r._mapping)))
@@ -146,21 +176,35 @@ def list_objectifs(
     effective = _check_id_anonyme(current_user, str(id_anonyme) if id_anonyme else None)
     if effective:
         log_admin_consultation_tiers(
-            db_logs, current_user, "GET /api/sante/objectifs", id_anonyme_cible=effective
+            db_logs,
+            current_user,
+            "GET /api/sante/objectifs",
+            id_anonyme_cible=effective,
         )
         rows = db.execute(
-            text("SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut FROM objectif_utilisateur WHERE id_anonyme = :id"),
+            text(
+                "SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut FROM objectif_utilisateur WHERE id_anonyme = :id"
+            ),
             {"id": effective},
         ).fetchall()
     else:
         log_admin_consultation_tiers(
-            db_logs, current_user, "GET /api/sante/objectifs", details_extra={"liste_complete": True}
+            db_logs,
+            current_user,
+            "GET /api/sante/objectifs",
+            details_extra={"liste_complete": True},
         )
-        rows = db.execute(text("SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut FROM objectif_utilisateur")).fetchall()
+        rows = db.execute(
+            text(
+                "SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut FROM objectif_utilisateur"
+            )
+        ).fetchall()
     return [ObjectifRead.model_validate(dict(r._mapping)) for r in rows]
 
 
-@router.post("/objectifs", response_model=ObjectifRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/objectifs", response_model=ObjectifRead, status_code=status.HTTP_201_CREATED
+)
 def create_objectif(
     body: ObjectifCreate,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
@@ -200,11 +244,15 @@ def modifier_objectif(
     """Met à jour un objectif appartenant à l'utilisateur connecté."""
     id_anonyme = str(current_user.id_anonyme)
     row = db.execute(
-        text("SELECT id_objectif_u FROM objectif_utilisateur WHERE id_objectif_u = :id AND id_anonyme = :aid"),
+        text(
+            "SELECT id_objectif_u FROM objectif_utilisateur WHERE id_objectif_u = :id AND id_anonyme = :aid"
+        ),
         {"id": id_objectif_u, "aid": id_anonyme},
     ).fetchone()
     if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Objectif non trouvé")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Objectif non trouvé"
+        )
     updates = []
     params = {"id": id_objectif_u}
     if body.type_objectif is not None:
@@ -227,15 +275,22 @@ def modifier_objectif(
         params["statut"] = body.statut
     if not updates:
         r = db.execute(
-            text("SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut FROM objectif_utilisateur WHERE id_objectif_u = :id"),
+            text(
+                "SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut FROM objectif_utilisateur WHERE id_objectif_u = :id"
+            ),
             {"id": id_objectif_u},
         ).fetchone()
         return ObjectifRead.model_validate(dict(r._mapping))
     set_clause = ", ".join(updates)
-    db.execute(text(f"UPDATE objectif_utilisateur SET {set_clause} WHERE id_objectif_u = :id"), params)
+    db.execute(
+        text(f"UPDATE objectif_utilisateur SET {set_clause} WHERE id_objectif_u = :id"),
+        params,
+    )
     db.commit()
     r = db.execute(
-        text("SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut FROM objectif_utilisateur WHERE id_objectif_u = :id"),
+        text(
+            "SELECT id_objectif_u, id_anonyme, type_objectif, valeur_cible, unite, date_debut, date_fin, statut FROM objectif_utilisateur WHERE id_objectif_u = :id"
+        ),
         {"id": id_objectif_u},
     ).fetchone()
     return ObjectifRead.model_validate(dict(r._mapping))
@@ -248,13 +303,18 @@ def list_journal(
     db: Session = Depends(get_session_sante),
     db_logs: Database = Depends(get_mongo_logs),
 ):
-    effective = _check_id_anonyme(current_user, str(id_anonyme) if id_anonyme else None) or current_user.id_anonyme
+    effective = (
+        _check_id_anonyme(current_user, str(id_anonyme) if id_anonyme else None)
+        or current_user.id_anonyme
+    )
     if effective and effective != current_user.id_anonyme:
         log_admin_consultation_tiers(
             db_logs, current_user, "GET /api/sante/journal", id_anonyme_cible=effective
         )
     rows = db.execute(
-        text("SELECT id_repas, id_anonyme, horodatage, nom_repas, type_repas, total_calories, total_proteines, total_glucides, total_lipides FROM journal_alimentaire WHERE id_anonyme = :id ORDER BY horodatage DESC"),
+        text(
+            "SELECT id_repas, id_anonyme, horodatage, nom_repas, type_repas, total_calories, total_proteines, total_glucides, total_lipides FROM journal_alimentaire WHERE id_anonyme = :id ORDER BY horodatage DESC"
+        ),
         {"id": effective},
     ).fetchall()
     return [JournalRead.model_validate(dict(r._mapping)) for r in rows]
@@ -267,13 +327,18 @@ def list_seances(
     db: Session = Depends(get_session_sante),
     db_logs: Database = Depends(get_mongo_logs),
 ):
-    effective = _check_id_anonyme(current_user, str(id_anonyme) if id_anonyme else None) or current_user.id_anonyme
+    effective = (
+        _check_id_anonyme(current_user, str(id_anonyme) if id_anonyme else None)
+        or current_user.id_anonyme
+    )
     if effective and effective != current_user.id_anonyme:
         log_admin_consultation_tiers(
             db_logs, current_user, "GET /api/sante/seances", id_anonyme_cible=effective
         )
     rows = db.execute(
-        text("SELECT id_seance, id_anonyme, horodatage, nom_seance, ressenti_effort_rpe FROM seance_activite WHERE id_anonyme = :id ORDER BY horodatage DESC"),
+        text(
+            "SELECT id_seance, id_anonyme, horodatage, nom_seance, ressenti_effort_rpe FROM seance_activite WHERE id_anonyme = :id ORDER BY horodatage DESC"
+        ),
         {"id": effective},
     ).fetchall()
     return [SeanceRead.model_validate(dict(r._mapping)) for r in rows]
@@ -290,21 +355,40 @@ def list_suivi_biometrique(
     effective = _check_id_anonyme(current_user, str(id_anonyme) if id_anonyme else None)
     if effective:
         log_admin_consultation_tiers(
-            db_logs, current_user, "GET /api/sante/suivi-biometrique", id_anonyme_cible=effective
+            db_logs,
+            current_user,
+            "GET /api/sante/suivi-biometrique",
+            id_anonyme_cible=effective,
         )
         rows = db.execute(
-            text("SELECT id_biometrie, id_anonyme, date_releve, poids_kg, score_sommeil FROM suivi_biometrique WHERE id_anonyme = :id ORDER BY date_releve DESC"),
+            text(
+                "SELECT id_biometrie, id_anonyme, date_releve, poids_kg, score_sommeil FROM suivi_biometrique WHERE id_anonyme = :id ORDER BY date_releve DESC"
+            ),
             {"id": effective},
         ).fetchall()
     else:
         log_admin_consultation_tiers(
-            db_logs, current_user, "GET /api/sante/suivi-biometrique", details_extra={"liste_complete": True}
+            db_logs,
+            current_user,
+            "GET /api/sante/suivi-biometrique",
+            details_extra={"liste_complete": True},
         )
-        rows = db.execute(text("SELECT id_biometrie, id_anonyme, date_releve, poids_kg, score_sommeil FROM suivi_biometrique ORDER BY date_releve DESC")).fetchall()
-    return [SuiviBiometriqueRead.model_validate(fe.decrypt_biometrie_row(dict(r._mapping))) for r in rows]
+        rows = db.execute(
+            text(
+                "SELECT id_biometrie, id_anonyme, date_releve, poids_kg, score_sommeil FROM suivi_biometrique ORDER BY date_releve DESC"
+            )
+        ).fetchall()
+    return [
+        SuiviBiometriqueRead.model_validate(fe.decrypt_biometrie_row(dict(r._mapping)))
+        for r in rows
+    ]
 
 
-@router.post("/suivi-biometrique", response_model=SuiviBiometriqueRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/suivi-biometrique",
+    response_model=SuiviBiometriqueRead,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_suivi_biometrique(
     body: SuiviBiometriqueCreate,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
@@ -329,7 +413,9 @@ def create_suivi_biometrique(
         },
     ).fetchone()
     db.commit()
-    return SuiviBiometriqueRead.model_validate(fe.decrypt_biometrie_row(dict(row._mapping)))
+    return SuiviBiometriqueRead.model_validate(
+        fe.decrypt_biometrie_row(dict(row._mapping))
+    )
 
 
 @router.patch("/suivi-biometrique/{id_biometrie}", response_model=SuiviBiometriqueRead)
@@ -342,11 +428,16 @@ def modifier_suivi_biometrique(
     """Met à jour un relevé biométrique appartenant à l'utilisateur connecté."""
     id_anonyme = str(current_user.id_anonyme)
     row = db.execute(
-        text("SELECT id_biometrie FROM suivi_biometrique WHERE id_biometrie = :id AND id_anonyme = :aid"),
+        text(
+            "SELECT id_biometrie FROM suivi_biometrique WHERE id_biometrie = :id AND id_anonyme = :aid"
+        ),
         {"id": id_biometrie, "aid": id_anonyme},
     ).fetchone()
     if not row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Relevé biométrique non trouvé")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Relevé biométrique non trouvé",
+        )
     updates = []
     params = {"id": id_biometrie}
     if body.date_releve is not None:
@@ -360,18 +451,29 @@ def modifier_suivi_biometrique(
         params["score_sommeil"] = fe.encrypt_int(body.score_sommeil)
     if not updates:
         r = db.execute(
-            text("SELECT id_biometrie, id_anonyme, date_releve, poids_kg, score_sommeil FROM suivi_biometrique WHERE id_biometrie = :id"),
+            text(
+                "SELECT id_biometrie, id_anonyme, date_releve, poids_kg, score_sommeil FROM suivi_biometrique WHERE id_biometrie = :id"
+            ),
             {"id": id_biometrie},
         ).fetchone()
-        return SuiviBiometriqueRead.model_validate(fe.decrypt_biometrie_row(dict(r._mapping)))
+        return SuiviBiometriqueRead.model_validate(
+            fe.decrypt_biometrie_row(dict(r._mapping))
+        )
     set_clause = ", ".join(updates)
-    db.execute(text(f"UPDATE suivi_biometrique SET {set_clause} WHERE id_biometrie = :id"), params)
+    db.execute(
+        text(f"UPDATE suivi_biometrique SET {set_clause} WHERE id_biometrie = :id"),
+        params,
+    )
     db.commit()
     r = db.execute(
-        text("SELECT id_biometrie, id_anonyme, date_releve, poids_kg, score_sommeil FROM suivi_biometrique WHERE id_biometrie = :id"),
+        text(
+            "SELECT id_biometrie, id_anonyme, date_releve, poids_kg, score_sommeil FROM suivi_biometrique WHERE id_biometrie = :id"
+        ),
         {"id": id_biometrie},
     ).fetchone()
-    return SuiviBiometriqueRead.model_validate(fe.decrypt_biometrie_row(dict(r._mapping)))
+    return SuiviBiometriqueRead.model_validate(
+        fe.decrypt_biometrie_row(dict(r._mapping))
+    )
 
 
 @router.get("/mes-restrictions", response_model=list[RestrictionRead])
@@ -390,7 +492,10 @@ def list_mes_restrictions(
         """),
         {"id": id_anonyme},
     ).fetchall()
-    return [RestrictionRead.model_validate(fe.decrypt_restriction_row(dict(r._mapping))) for r in rows]
+    return [
+        RestrictionRead.model_validate(fe.decrypt_restriction_row(dict(r._mapping)))
+        for r in rows
+    ]
 
 
 @router.put("/mes-restrictions", response_model=list[RestrictionRead])
@@ -401,10 +506,15 @@ def modifier_mes_restrictions(
 ):
     """Remplace les restrictions de l'utilisateur connecté par la liste fournie (id_restrictions)."""
     id_anonyme = str(current_user.id_anonyme)
-    db.execute(text("DELETE FROM utilisateur_restriction WHERE id_anonyme = :id"), {"id": id_anonyme})
+    db.execute(
+        text("DELETE FROM utilisateur_restriction WHERE id_anonyme = :id"),
+        {"id": id_anonyme},
+    )
     for id_restriction in body.id_restrictions:
         db.execute(
-            text("INSERT INTO utilisateur_restriction (id_anonyme, id_restriction) VALUES (:aid, :rid) ON CONFLICT (id_anonyme, id_restriction) DO NOTHING"),
+            text(
+                "INSERT INTO utilisateur_restriction (id_anonyme, id_restriction) VALUES (:aid, :rid) ON CONFLICT (id_anonyme, id_restriction) DO NOTHING"
+            ),
             {"aid": id_anonyme, "rid": id_restriction},
         )
     db.commit()
@@ -417,7 +527,10 @@ def modifier_mes_restrictions(
         """),
         {"id": id_anonyme},
     ).fetchall()
-    return [RestrictionRead.model_validate(fe.decrypt_restriction_row(dict(r._mapping))) for r in rows]
+    return [
+        RestrictionRead.model_validate(fe.decrypt_restriction_row(dict(r._mapping)))
+        for r in rows
+    ]
 
 
 @router.get("/mes-materiel", response_model=list[ReferentielRead])
@@ -447,10 +560,15 @@ def modifier_mes_materiel(
 ):
     """Remplace le matériel de l'utilisateur connecté par la liste fournie (id_materiels)."""
     id_anonyme = str(current_user.id_anonyme)
-    db.execute(text("DELETE FROM utilisateur_materiel WHERE id_anonyme = :id"), {"id": id_anonyme})
+    db.execute(
+        text("DELETE FROM utilisateur_materiel WHERE id_anonyme = :id"),
+        {"id": id_anonyme},
+    )
     for id_materiel in body.id_materiels:
         db.execute(
-            text("INSERT INTO utilisateur_materiel (id_anonyme, id_materiel) VALUES (:aid, :mid) ON CONFLICT (id_anonyme, id_materiel) DO NOTHING"),
+            text(
+                "INSERT INTO utilisateur_materiel (id_anonyme, id_materiel) VALUES (:aid, :mid) ON CONFLICT (id_anonyme, id_materiel) DO NOTHING"
+            ),
             {"aid": id_anonyme, "mid": id_materiel},
         )
     db.commit()
@@ -471,8 +589,13 @@ def list_restrictions(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Session = Depends(get_session_sante),
 ):
-    rows = db.execute(text("SELECT id_restriction AS id, nom, type FROM ref_restriction")).fetchall()
-    return [RestrictionRead.model_validate(fe.decrypt_restriction_row(dict(r._mapping))) for r in rows]
+    rows = db.execute(
+        text("SELECT id_restriction AS id, nom, type FROM ref_restriction")
+    ).fetchall()
+    return [
+        RestrictionRead.model_validate(fe.decrypt_restriction_row(dict(r._mapping)))
+        for r in rows
+    ]
 
 
 @router.get("/referentiels/exercices", response_model=list[ReferentielRead])
@@ -480,7 +603,9 @@ def list_exercices(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     db: Session = Depends(get_session_sante),
 ):
-    rows = db.execute(text("SELECT id_exercice AS id, nom, muscle_principal FROM ref_exercice")).fetchall()
+    rows = db.execute(
+        text("SELECT id_exercice AS id, nom, muscle_principal FROM ref_exercice")
+    ).fetchall()
     return [ReferentielRead.model_validate(dict(r._mapping)) for r in rows]
 
 

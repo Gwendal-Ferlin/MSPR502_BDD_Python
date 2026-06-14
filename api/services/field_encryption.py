@@ -101,7 +101,9 @@ def decrypt_compte_row(row: dict) -> dict:
     return d
 
 
-def persist_compte_email_password(email_plain: str, password_bcrypt: str) -> tuple[str, str | None, str]:
+def persist_compte_email_password(
+    email_plain: str, password_bcrypt: str
+) -> tuple[str, str | None, str]:
     """Retourne (email_db, email_hmac_ou_none, password_db)."""
     e = email_plain.strip().lower()
     if encryption_enabled():
@@ -175,5 +177,7 @@ def decrypt_biometrie_row(row: dict) -> dict:
     return d
 
 
-def encrypt_biometrie_write(poids_kg: float | None, score_sommeil: int | None) -> tuple[str | None, str | None]:
+def encrypt_biometrie_write(
+    poids_kg: float | None, score_sommeil: int | None
+) -> tuple[str | None, str | None]:
     return encrypt_float(poids_kg), encrypt_int(score_sommeil)

@@ -16,9 +16,7 @@ def rate_limit_key(request: Request) -> str:
     return get_remote_address(request)
 
 
-_default_limits = (
-    [settings.rate_limit_default] if settings.rate_limit_enabled else []
-)
+_default_limits = [settings.rate_limit_default] if settings.rate_limit_enabled else []
 
 limiter = Limiter(
     key_func=rate_limit_key,

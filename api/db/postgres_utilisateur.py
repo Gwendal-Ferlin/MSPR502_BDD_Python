@@ -6,7 +6,9 @@ engine_utilisateur = create_engine(
     settings.postgres_utilisateur_url,
     pool_pre_ping=True,
 )
-SessionUtilisateur = sessionmaker(autocommit=False, autoflush=False, bind=engine_utilisateur)
+SessionUtilisateur = sessionmaker(
+    autocommit=False, autoflush=False, bind=engine_utilisateur
+)
 
 
 def get_session_utilisateur() -> Session:

@@ -15,7 +15,9 @@ def _resolve_script_path() -> Path:
     if docker_path.is_file():
         return docker_path
     # api/services/ia_recommendations.py -> parents[2] = racine du projet
-    local = Path(__file__).resolve().parents[2] / "ia-reco" / "Ia_recom_mistral_distant.py"
+    local = (
+        Path(__file__).resolve().parents[2] / "ia-reco" / "Ia_recom_mistral_distant.py"
+    )
     if local.is_file():
         return local
     raise FileNotFoundError(

@@ -121,11 +121,13 @@ class RestrictionRead(BaseModel):
 
 class MesRestrictionsUpdate(BaseModel):
     """Liste des id_restriction à associer à l'utilisateur (remplace les restrictions actuelles)."""
+
     id_restrictions: list[int]
 
 
 class MesMaterielUpdate(BaseModel):
     """Liste des id_materiel à associer à l'utilisateur (remplace le matériel actuel)."""
+
     id_materiels: list[int]
 
 

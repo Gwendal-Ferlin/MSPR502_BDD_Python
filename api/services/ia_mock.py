@@ -27,10 +27,30 @@ def generer_programme(data: dict[str, Any]) -> dict[str, Any]:
         "niveau": niveau,
         "objectif": objectif,
         "programme": [
-            {"exercice": "Squat (Quadriceps)", "series": series, "repetitions": reps, "temps_de_repos": 90},
-            {"exercice": "Pompes (Pectoraux)", "series": series, "repetitions": reps, "temps_de_repos": 60},
-            {"exercice": "Rowing haltères (Dos)", "series": series, "repetitions": reps, "temps_de_repos": 75},
-            {"exercice": "Planche (Abdominaux)", "series": series, "repetitions": 1, "temps_de_repos": 45},
+            {
+                "exercice": "Squat (Quadriceps)",
+                "series": series,
+                "repetitions": reps,
+                "temps_de_repos": 90,
+            },
+            {
+                "exercice": "Pompes (Pectoraux)",
+                "series": series,
+                "repetitions": reps,
+                "temps_de_repos": 60,
+            },
+            {
+                "exercice": "Rowing haltères (Dos)",
+                "series": series,
+                "repetitions": reps,
+                "temps_de_repos": 75,
+            },
+            {
+                "exercice": "Planche (Abdominaux)",
+                "series": series,
+                "repetitions": 1,
+                "temps_de_repos": 45,
+            },
         ],
         "progression": {"nombre_semaines": nombre_semaines},
         "_mock": True,
@@ -89,6 +109,10 @@ def generer_plats(data: dict[str, Any]) -> dict[str, Any]:
             {"ingredient": "Riz", "quantite": "300 g", "categorie": "féculents"},
             {"ingredient": "Brocoli", "quantite": "200 g", "categorie": "légumes"},
         ],
-        "budget": {"niveau": 2, "libelle": "standard", "ingredients_reference_count": 3},
+        "budget": {
+            "niveau": 2,
+            "libelle": "standard",
+            "ingredients_reference_count": 3,
+        },
         "_mock": True,
     }

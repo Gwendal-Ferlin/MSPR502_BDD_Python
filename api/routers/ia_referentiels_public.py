@@ -21,7 +21,9 @@ router = APIRouter(prefix="/sante/referentiels/ia", tags=["Santé - Référentie
 @router.get("/exercices", response_model=list[ExerciceCatalogueRead])
 def list_exercices_catalogue(
     db: Session = Depends(get_session_sante),
-    niveau: str | None = Query(None, description="Filtrer par niveau : facile, normal, intensif"),
+    niveau: str | None = Query(
+        None, description="Filtrer par niveau : facile, normal, intensif"
+    ),
 ):
     """Catalogue exercices IA (`exercices.txt` → `ref_exercice`). Public, sans authentification."""
     sql = """
@@ -79,7 +81,9 @@ def list_ingredients_catalogue(
         le=3,
         description="Ingrédients avec budget <= cette valeur (1=économique … 3=premium)",
     ),
-    q: str | None = Query(None, description="Recherche partielle sur le nom (insensible à la casse)"),
+    q: str | None = Query(
+        None, description="Recherche partielle sur le nom (insensible à la casse)"
+    ),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ):
@@ -121,13 +125,17 @@ def list_ingredients_catalogue(
     )
 
 
-@router.get("/restrictions-equivalences", response_model=RestrictionEquivalenceListResponse)
+@router.get(
+    "/restrictions-equivalences", response_model=RestrictionEquivalenceListResponse
+)
 def list_restrictions_equivalences(
     db: Session = Depends(get_session_sante),
 ):
     """Équivalences FR/EN pour l’IA plats (`restrictions_equivalences.json` → tables dédiées). Public."""
     cles = db.execute(
-        text("SELECT cle_canonique FROM ref_restriction_equivalence ORDER BY cle_canonique")
+        text(
+            "SELECT cle_canonique FROM ref_restriction_equivalence ORDER BY cle_canonique"
+        )
     ).fetchall()
     items: list[RestrictionEquivalenceRead] = []
     for row in cles:

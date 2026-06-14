@@ -26,7 +26,9 @@ def fetch_auteur_public(db: Session, id_anonyme: str) -> AuteurPublicRead | None
     )
 
 
-def fetch_auteurs_public(db: Session, id_anonymes: set[str]) -> dict[str, AuteurPublicRead]:
+def fetch_auteurs_public(
+    db: Session, id_anonymes: set[str]
+) -> dict[str, AuteurPublicRead]:
     if not id_anonymes:
         return {}
     rows = db.execute(

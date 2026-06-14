@@ -16,7 +16,11 @@ from api.schemas.social import (
     PublicationRead,
 )
 from api.services.minio_storage import infer_media_type_from_url
-from api.services.social_helpers import fetch_auteur_public, fetch_auteurs_public, is_admin
+from api.services.social_helpers import (
+    fetch_auteur_public,
+    fetch_auteurs_public,
+    is_admin,
+)
 
 router = APIRouter(prefix="/publications", tags=["Publications"])
 
@@ -51,7 +55,9 @@ def _get_publication_or_404(db: Session, id_publication: str):
         {"id": id_publication},
     ).fetchone()
     if not row or row._mapping["est_supprime"]:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Publication non trouvée")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Publication non trouvée"
+        )
     return row
 
 
@@ -168,16 +174,22 @@ def supprimer_commentaire(
         {"id": str(id_commentaire)},
     ).fetchone()
     if not row or row._mapping["est_supprime"]:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Commentaire non trouvé")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Commentaire non trouvé"
+        )
 
     mapping = row._mapping
     is_owner = str(mapping["id_anonyme"]) == current_user.id_anonyme
     is_pub_owner = str(mapping["auteur_publication"]) == current_user.id_anonyme
     if not (is_owner or is_pub_owner or is_admin(current_user.role)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants"
+        )
 
     db.execute(
-        text("UPDATE publication_commentaire SET est_supprime = true WHERE id_commentaire = :id"),
+        text(
+            "UPDATE publication_commentaire SET est_supprime = true WHERE id_commentaire = :id"
+        ),
         {"id": str(id_commentaire)},
     )
     db.commit()
@@ -191,8 +203,12 @@ def supprimer_publication(
     db: Session = Depends(get_session_utilisateur),
 ):
     row = _get_publication_or_404(db, str(id_publication))
-    if str(row._mapping["id_anonyme"]) != current_user.id_anonyme and not is_admin(current_user.role):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants")
+    if str(row._mapping["id_anonyme"]) != current_user.id_anonyme and not is_admin(
+        current_user.role
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants"
+        )
 
     db.execute(
         text("UPDATE publication SET est_supprime = true WHERE id_publication = :id"),

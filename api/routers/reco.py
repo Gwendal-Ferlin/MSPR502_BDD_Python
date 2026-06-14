@@ -13,7 +13,10 @@ from api.db.postgres_gamification import get_session_gamification
 from api.schemas.auth import CurrentUser
 from api.schemas.reco import RecommendationRead, RepasCreate, RepasRead
 from api.services.log_admin import log_admin_consultation_tiers
-from api.services.gamification_rewards import COINS_PER_REPAS_CREATED, reward_coins_repas_created
+from api.services.gamification_rewards import (
+    COINS_PER_REPAS_CREATED,
+    reward_coins_repas_created,
+)
 
 router = APIRouter(prefix="/reco", tags=["Recommandations"])
 
@@ -32,7 +35,10 @@ def list_recommendations(
         if id_anonyme:
             q["id_anonyme"] = id_anonyme
             log_admin_consultation_tiers(
-                db_logs, current_user, "GET /api/reco/recommendations", id_anonyme_cible=id_anonyme
+                db_logs,
+                current_user,
+                "GET /api/reco/recommendations",
+                id_anonyme_cible=id_anonyme,
             )
     else:
         q["id_anonyme"] = current_user.id_anonyme
@@ -75,7 +81,10 @@ def list_repas(
         if id_anonyme:
             q["id_anonyme"] = id_anonyme
             log_admin_consultation_tiers(
-                db_logs, current_user, "GET /api/reco/repas", id_anonyme_cible=id_anonyme
+                db_logs,
+                current_user,
+                "GET /api/reco/repas",
+                id_anonyme_cible=id_anonyme,
             )
     else:
         q["id_anonyme"] = current_user.id_anonyme
@@ -93,13 +102,22 @@ def get_repas(
     try:
         oid = ObjectId(repas_id)
     except Exception:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repas non trouvé")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Repas non trouvé"
+        )
     coll = db["repas"]
     doc = coll.find_one({"_id": oid})
     if not doc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Repas non trouvé")
-    if current_user.role not in ("Admin", "Super-Admin") and doc.get("id_anonyme") != current_user.id_anonyme:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Repas non trouvé"
+        )
+    if (
+        current_user.role not in ("Admin", "Super-Admin")
+        and doc.get("id_anonyme") != current_user.id_anonyme
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Droits insuffisants"
+        )
     return _repas_doc_to_read(doc)
 
 

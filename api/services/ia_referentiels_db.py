@@ -15,7 +15,9 @@ def count_ref_ingredients(session: Session) -> int:
     return int(row._mapping["n"]) if row else 0
 
 
-def load_materiels_catalogue(session: Session | None = None) -> list[dict[str, Any]] | None:
+def load_materiels_catalogue(
+    session: Session | None = None,
+) -> list[dict[str, Any]] | None:
     """Format moteur IA : id, nom (aligné sur materiels.txt)."""
     own = session is None
     if own:
@@ -35,13 +37,17 @@ def load_materiels_catalogue(session: Session | None = None) -> list[dict[str, A
             session.close()
 
 
-def load_exercice_materiel_liaisons(session: Session | None = None) -> list[dict[str, Any]] | None:
+def load_exercice_materiel_liaisons(
+    session: Session | None = None,
+) -> list[dict[str, Any]] | None:
     own = session is None
     if own:
         session = SessionSante()
     try:
         rows = session.execute(
-            text("SELECT id_exercice, id_materiel FROM exercice_materiel ORDER BY id_exercice, id_materiel")
+            text(
+                "SELECT id_exercice, id_materiel FROM exercice_materiel ORDER BY id_exercice, id_materiel"
+            )
         ).fetchall()
         if not rows:
             return None
@@ -57,7 +63,9 @@ def load_exercice_materiel_liaisons(session: Session | None = None) -> list[dict
             session.close()
 
 
-def load_exercices_catalogue(session: Session | None = None) -> list[dict[str, Any]] | None:
+def load_exercices_catalogue(
+    session: Session | None = None,
+) -> list[dict[str, Any]] | None:
     """Liste au format moteur IA : id, nom, muscle, niveau."""
     own = session is None
     if own:
@@ -89,14 +97,18 @@ def load_exercices_catalogue(session: Session | None = None) -> list[dict[str, A
             session.close()
 
 
-def load_restriction_equivalences(session: Session | None = None) -> dict[str, list[str]] | None:
+def load_restriction_equivalences(
+    session: Session | None = None,
+) -> dict[str, list[str]] | None:
     """Dict cle_canonique -> liste d'alias (comme restrictions_equivalences.json)."""
     own = session is None
     if own:
         session = SessionSante()
     try:
         cles = session.execute(
-            text("SELECT cle_canonique FROM ref_restriction_equivalence ORDER BY cle_canonique")
+            text(
+                "SELECT cle_canonique FROM ref_restriction_equivalence ORDER BY cle_canonique"
+            )
         ).fetchall()
         if not cles:
             return None

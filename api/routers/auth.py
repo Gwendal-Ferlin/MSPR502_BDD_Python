@@ -69,7 +69,9 @@ def login(
                 detail="Vault manquant pour cet utilisateur",
             )
         id_anonyme = str(vault._mapping["id_anonyme"])
-        expire_at = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
+        expire_at = datetime.now(timezone.utc) + timedelta(
+            minutes=settings.jwt_expire_minutes
+        )
         # python-jose exige un NumericDate (secondes UTC), pas un datetime — sinon erreur 500 à l'encodage.
         payload = {
             "sub": str(user["id_user"]),
@@ -92,7 +94,9 @@ def login(
     except HTTPException:
         raise
     except SQLAlchemyError:
-        _log.exception("Login : erreur SQL base utilisateur (connexion, schéma ou table manquante)")
+        _log.exception(
+            "Login : erreur SQL base utilisateur (connexion, schéma ou table manquante)"
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(

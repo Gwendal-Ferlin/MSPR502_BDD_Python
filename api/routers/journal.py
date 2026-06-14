@@ -68,4 +68,3 @@ def get_total_calories_jour(
     ).fetchone()
     total = float(row._mapping["total_calories"])
     return CaloriesJourRead(date=date_jour, total_calories=total)
-
