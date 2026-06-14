@@ -75,6 +75,10 @@ flowchart LR
 | Postgres gamification |           5432 |              5434 | `psql -h localhost -p 5434 ...` |
 | MongoDB logs          |          27017 |             27017 | `mongosh --port 27017`          |
 | MongoDB reco          |          27017 |             27018 | `mongosh --port 27018`          |
+| Prometheus (PC)       |           9090 |              9090 | `http://localhost:9090`       |
+| Grafana (PC)          |           3000 |              3001 | `http://localhost:3001`         |
+
+> **Monitoring** : Prometheus et Grafana sont documentés en détail dans la section [Monitoring (Prometheus & Grafana)](#monitoring-prometheus--grafana). Sur le serveur (`docker-compose.yml`), les ports hôte sont **19090** (Prometheus) et **13001** (Grafana).
 
 ### Arrêt
 
@@ -165,6 +169,14 @@ docker cp init/postgres-utilisateur/04_migration_abonnement.sql postgres-utilisa
 docker exec postgres-utilisateur psql -U utilisateur_user -d utilisateur_db -f /tmp/04_migration_abonnement.sql
 ```
 
+**6 bis) Migration communauté — profil public & publications (Postgres utilisateur déjà existant) :**  
+À exécuter si la base `utilisateur_db` existe déjà sans `nom_affichage` / `photo_profil_url` sur `compte_utilisateur`, ni les tables `publication`, `publication_like`, `publication_commentaire` (fil social, likes, commentaires).
+
+```bash
+docker cp init/postgres-utilisateur/08_migration_profil_public_social.sql postgres-utilisateur:/tmp/
+docker exec postgres-utilisateur psql -U utilisateur_user -d utilisateur_db -f /tmp/08_migration_profil_public_social.sql
+```
+
 **7) Migration objectifs (Postgres santé déjà existant) :**  
 À exécuter si la base `sante_db` existe déjà sans la colonne `date_fin` dans `objectif_utilisateur`.
 
@@ -239,12 +251,39 @@ erDiagram
         boolean est_supprime
         datetime date_fin_periode_payee
         boolean desabonnement_a_fin_periode
+        string nom_affichage
+        string photo_profil_url
     }
     VAULT_CORRESPONDANCE {
         uuid id_anonyme PK
         int id_user FK
         datetime date_derniere_activite
         boolean consentement_sante_actif
+    }
+    VAULT_CORRESPONDANCE ||--o{ PUBLICATION : "publie"
+    PUBLICATION ||--o{ PUBLICATION_LIKE : "reçoit"
+    PUBLICATION ||--o{ PUBLICATION_COMMENTAIRE : "a"
+    PUBLICATION {
+        uuid id_publication PK
+        uuid id_anonyme
+        string texte
+        string media_url
+        string media_type
+        datetime date_creation
+        boolean est_supprime
+    }
+    PUBLICATION_LIKE {
+        uuid id_publication FK
+        uuid id_anonyme
+        datetime date_creation
+    }
+    PUBLICATION_COMMENTAIRE {
+        uuid id_commentaire PK
+        uuid id_publication FK
+        uuid id_anonyme
+        string texte
+        datetime date_creation
+        boolean est_supprime
     }
     VAULT_CORRESPONDANCE ||--|| PROFIL_SANTE : "définit"
     VAULT_CORRESPONDANCE ||--o{ OBJECTIF_UTILISATEUR : "poursuit"
@@ -358,6 +397,9 @@ erDiagram
 ```mermaid
 erDiagram
     COMPTE_UTILISATEUR ||--|| VAULT_CORRESPONDANCE : "identifie"
+    VAULT_CORRESPONDANCE ||--o{ PUBLICATION : "publie"
+    PUBLICATION ||--o{ PUBLICATION_LIKE : "reçoit"
+    PUBLICATION ||--o{ PUBLICATION_COMMENTAIRE : "a"
     COMPTE_UTILISATEUR {
         int id_user PK
         string email
@@ -368,6 +410,8 @@ erDiagram
         boolean est_supprime
         datetime date_fin_periode_payee
         boolean desabonnement_a_fin_periode
+        string nom_affichage
+        string photo_profil_url
     }
     VAULT_CORRESPONDANCE {
         uuid id_anonyme PK
@@ -375,7 +419,40 @@ erDiagram
         datetime date_derniere_activite
         boolean consentement_sante_actif
     }
+    PUBLICATION {
+        uuid id_publication PK
+        uuid id_anonyme
+        string texte
+        string media_url
+        string media_type
+        datetime date_creation
+        boolean est_supprime
+    }
+    PUBLICATION_LIKE {
+        uuid id_publication FK
+        uuid id_anonyme
+        datetime date_creation
+    }
+    PUBLICATION_COMMENTAIRE {
+        uuid id_commentaire PK
+        uuid id_publication FK
+        uuid id_anonyme
+        string texte
+        datetime date_creation
+        boolean est_supprime
+    }
 ```
+
+**Tables communauté** (`init/postgres-utilisateur/01_schema.sql` ; migration incrémentale : `08_migration_profil_public_social.sql`) :
+
+| Table | Colonnes principales | Rôle |
+| ----- | -------------------- | ---- |
+| `compte_utilisateur` | `nom_affichage`, `photo_profil_url` (en plus des colonnes compte) | Profil public affiché dans le fil communauté |
+| `publication` | `id_publication`, `id_anonyme`, `texte`, `media_url`, `media_type` (`image` \| `video`), `date_creation`, `est_supprime` | Post du fil d’actualité |
+| `publication_like` | `id_publication`, `id_anonyme`, `date_creation` — PK composite | Like d’un utilisateur sur une publication |
+| `publication_commentaire` | `id_commentaire`, `id_publication`, `id_anonyme`, `texte`, `date_creation`, `est_supprime` | Commentaire sous une publication |
+
+Les publications et interactions sont liées à l’**`id_anonyme`** (comme en base santé), pas au `id_user` directement. Les médias (`media_url`) sont stockés via **MinIO** côté API.
 
 #### PostgreSQL — `sante_db`
 
@@ -601,7 +678,7 @@ erDiagram
 
 | Base / Store                     | Rôle                                                                                                                                          |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| **PostgreSQL** `utilisateur_db`  | `compte_utilisateur`, `vault_correspondance` (lien id_user ↔ id_anonyme)                                                                      |
+| **PostgreSQL** `utilisateur_db`  | `compte_utilisateur` (dont profil public : `nom_affichage`, `photo_profil_url`), `vault_correspondance` (lien id_user ↔ id_anonyme), communauté : `publication`, `publication_like`, `publication_commentaire` |
 | **PostgreSQL** `sante_db`        | Profil santé, objectifs, suivi biométrique, journal alimentaire, séances, référentiels (restrictions utilisateur, exercices IA, ingrédients IA, équivalences restrictions, matériel), tables de liaison |
 | **PostgreSQL** `gamification_db` | Inventaire animaux/chromas par utilisateur, monnaie (pépites), transactions, catalogues animaux et chromas                                    |
 | **MongoDB** `logs_config`        | Événements / logs (collection `evenements`) et config                                                                                         |
@@ -800,6 +877,113 @@ Quand une route est **Logué = Oui** et qu'un Admin/Super-Admin consulte des don
 La consultation par un admin de **ses propres** données (même `id_user` ou `id_anonyme`) n'est pas loguée.
 
 Quand un Admin/Super-Admin **supprime** le compte d'un tiers (DELETE /api/utilisateurs/{id_user} avec id_user ≠ soi-même), un événement est enregistré avec **action** : `suppression_utilisateur_tiers` et **details_techniques** : `endpoint`, `role_acteur`, `id_user_acteur`, `id_user_cible`.
+
+---
+
+## Monitoring (Prometheus & Grafana)
+
+La stack de **monitoring** complète Metabase (analytique métier) : elle suit en temps réel la **santé** et les **performances HTTP** de l’API.
+
+| Outil | Rôle |
+| ----- | ---- |
+| **Prometheus** | Collecte les métriques (scrape toutes les 15 s) |
+| **Grafana** | Visualise les métriques via des dashboards |
+| **API `/metrics`** | Expose les compteurs et histogrammes HTTP (`prometheus-fastapi-instrumentator`) |
+
+Metabase reste dédié aux **requêtes SQL** sur les bases ; Prometheus/Grafana surveillent le **comportement runtime** de l’API (débit, erreurs, latence).
+
+### Démarrage
+
+Les services `prometheus` et `grafana` démarrent avec le reste de la pile.
+
+**En local (PC, avec init automatique des BDD)** :
+
+```bash
+docker compose -f docker-compose-pc.yml up -d --build
+```
+
+**Serveur / TrueNAS** (`docker-compose.yml`, ports hôte décalés) :
+
+```bash
+docker compose up -d --build
+```
+
+Après modification de `api/main.py` ou `api/requirements.txt`, reconstruire l’API pour activer `/metrics` :
+
+```bash
+docker compose -f docker-compose-pc.yml up -d --build api
+# ou, sur serveur :
+docker compose up -d --build api
+```
+
+### Accès
+
+| Service | `docker-compose-pc.yml` (local) | `docker-compose.yml` (serveur) |
+| ------- | --------------------------------- | -------------------------------- |
+| **Prometheus** | http://localhost:9090 | http://localhost:19090 |
+| **Grafana** | http://localhost:3001 | http://localhost:13001 |
+| **Métriques API** | http://localhost:8000/metrics | http://localhost:18000/metrics |
+| **Cibles Prometheus** | http://localhost:9090/targets | http://localhost:19090/targets |
+
+Identifiants Grafana par défaut : **`admin`** / **`admin`** (modifiables via `.env`, voir ci-dessous). Au premier login, Grafana peut proposer de changer le mot de passe.
+
+### Dashboard provisionné
+
+Un dashboard est **importé automatiquement** au démarrage de Grafana :
+
+- **Dossier** : `MSPR502`
+- **Titre** : *MSPR502 — API HealthAI Coach*
+- **Fichier source** : `monitoring/grafana/dashboards/mspr502-api.json`
+
+Panels inclus :
+
+| Panel | Métrique / requête |
+| ----- | ------------------ |
+| API en ligne | `up{job="api"}` |
+| Requêtes / seconde | `sum(rate(http_requests_total[5m]))` |
+| Erreurs HTTP (4xx / 5xx) | `rate(http_requests_total{status=~"4..\|5.."}[5m])` |
+| Requêtes par code HTTP | `sum by (status) (rate(http_requests_total[5m]))` |
+| Top 10 routes | `topk(10, sum by (handler) (rate(http_requests_total[5m])))` |
+| Latence p50 / p95 / p99 | `histogram_quantile(...)` sur `http_request_duration_seconds_bucket` |
+
+Le dashboard se rafraîchit toutes les **30 s**. Pour voir des courbes, génère du trafic (Swagger `/docs`, appels API, etc.).
+
+### Vérifications rapides
+
+1. **Métriques API** : ouvrir `/metrics` — tu dois voir des lignes du type `http_requests_total`.
+2. **Prometheus** : *Status → Targets* — la cible **`api`** doit être **UP** (verte).
+3. **Grafana** : *Connections → Data sources → Prometheus* → **Save & test** doit réussir.
+4. **Dashboard** : *Dashboards → MSPR502 → MSPR502 — API HealthAI Coach*.
+
+### Fichiers de configuration
+
+```
+monitoring/
+├── prometheus/
+│   └── prometheus.yml          # jobs de scrape (prometheus + api:8000/metrics)
+└── grafana/
+    ├── dashboards/
+    │   └── mspr502-api.json    # dashboard API
+    └── provisioning/
+        ├── dashboards/
+        │   └── dashboards.yml  # chargement auto des dashboards
+        └── datasources/
+            └── prometheus.yml  # datasource Prometheus (uid: prometheus)
+```
+
+### Variables d’environnement (optionnel)
+
+Dans `.env` (voir `.env.example`) :
+
+| Variable | Défaut (local PC) | Description |
+| -------- | ----------------- | ----------- |
+| `PROMETHEUS_PORT` | `9090` | Port hôte Prometheus (`docker-compose-pc.yml`) |
+| `GRAFANA_PORT` | `3001` | Port hôte Grafana (`docker-compose-pc.yml`) |
+| `GRAFANA_ADMIN_USER` | `admin` | Compte administrateur Grafana |
+| `GRAFANA_ADMIN_PASSWORD` | `admin` | Mot de passe Grafana |
+| `GRAFANA_ROOT_URL` | `http://localhost:3001` | URL publique Grafana (liens, e-mails) |
+
+Sur le serveur (`docker-compose.yml`), les ports Prometheus/Grafana sont fixés à **19090** et **13001** ; adapter `GRAFANA_ROOT_URL` si besoin (ex. `http://192.168.1.150:13001`).
 
 ---
 

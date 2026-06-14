@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -49,6 +50,10 @@ app.include_router(ia_reco.router, prefix="/api")
 app.include_router(ia_referentiels_public.router, prefix="/api")
 app.include_router(medias.router, prefix="/api")
 app.include_router(publications.router, prefix="/api")
+
+Instrumentator(
+    excluded_handlers=["/metrics", "/health"],
+).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 
 @app.get("/")
