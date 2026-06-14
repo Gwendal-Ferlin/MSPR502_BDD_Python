@@ -40,45 +40,93 @@ L’API peut chiffrer **au niveau applicatif** certains champs PostgreSQL sensib
 
 À la racine du projet :
 
+**Local (PC, init automatique des BDD)** :
+
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose-pc.yml up -d --build
 ```
 
 - **API** : http://localhost:8000
 - **Documentation Swagger** : http://localhost:8000/docs
 
-Les services démarrent dans cet ordre : Postgres (utilisateur + santé), MongoDB (logs + reco), puis l’API une fois les bases healthy.
+**Serveur / TrueNAS** (`docker-compose.yml`, ports hôte décalés — voir ci-dessous) :
+
+```bash
+docker compose up -d --build
+```
+
+- **API** : http://localhost:18000
+- **Documentation Swagger** : http://localhost:18000/docs
+
+Les services démarrent dans cet ordre : Postgres (utilisateur, santé, gamification), MongoDB (logs + reco), MinIO, puis l’API une fois les bases healthy. Metabase, Prometheus et Grafana démarrent en parallèle.
 
 ### Schéma des ports exposés (hôte ↔ conteneur)
 
-Ce récapitulatif aide à comprendre les **décalages hôte/conteneur**. À l’intérieur du réseau Docker, les services communiquent via le **nom du service** et le **port conteneur** (ex. `postgres-sante:5432`). Les ports “hôte” servent surtout pour les outils externes (psql, mongosh, navigateur, etc.).
+Ce récapitulatif aide à comprendre les **décalages hôte/conteneur**. À l’intérieur du réseau Docker, les services communiquent via le **nom du service** et le **port conteneur** (ex. `postgres-sante:5432`, `api:8000`). Les ports « hôte » servent pour psql, mongosh, le navigateur, etc.
 
-#### Vue d’ensemble
+| Contexte | Fichier Compose | Commande |
+| -------- | --------------- | -------- |
+| **Local (PC)** | `docker-compose-pc.yml` | `docker compose -f docker-compose-pc.yml up -d --build` |
+| **Serveur / TrueNAS** | `docker-compose.yml` | `docker compose up -d --build` |
+
+#### Tableau des ports
+
+| Service | Port conteneur | Port hôte (PC) | Port hôte (serveur) | Exemple d’accès (PC) |
+| --------------------- | -------------: | -------------: | ------------------: | ----------------------------------- |
+| **API** | 8000 | 8000 | 18000 | http://localhost:8000 |
+| **Métriques API** (`/metrics`) | 8000 | 8000 | 18000 | http://localhost:8000/metrics |
+| **Postgres utilisateur** | 5432 | 5432 | 15432 | `psql -h localhost -p 5432 ...` |
+| **Postgres santé** | 5432 | 5433 | 15433 | `psql -h localhost -p 5433 ...` |
+| **Postgres gamification** | 5432 | 5434 | 15434 | `psql -h localhost -p 5434 ...` |
+| **MongoDB logs** | 27017 | 27017 | 27017 | `mongosh --port 27017` |
+| **MongoDB reco** | 27017 | 27018 | 27018 | `mongosh --port 27018` |
+| **MinIO (API S3)** | 9000 | 9000 | 19000 | http://localhost:9000 |
+| **MinIO (console)** | 9001 | 9001 | 19001 | http://localhost:9001 |
+| **Metabase** | 3000 | 3000¹ | 13000 | http://localhost:3000 |
+| **Prometheus** | 9090 | 9090² | 19090 | http://localhost:9090 |
+| **Grafana** | 3000 | 3001³ | 13001 | http://localhost:3001 |
+
+¹ Surcharge possible via `METABASE_PORT` dans `.env` (`docker-compose-pc.yml`).  
+² Surcharge possible via `PROMETHEUS_PORT` dans `.env`.  
+³ Surcharge possible via `GRAFANA_PORT` dans `.env` (défaut **3001** pour ne pas entrer en conflit avec Metabase sur 3000).
+
+Le service **`backup`** n’expose aucun port : il s’exécute à la demande (`docker compose run --rm backup`).
+
+#### Vue d’ensemble (local PC)
 
 ```mermaid
 flowchart LR
-  Host["Machine hôte"] -->|8000 → 8000| API["API (api)"]
-  Host -->|5432 → 5432| PGU["Postgres utilisateur"]
-  Host -->|5433 → 5432| PGS["Postgres santé"]
-  Host -->|5434 → 5432| PGG["Postgres gamification"]
-  Host -->|27017 → 27017| MLogs["MongoDB logs"]
-  Host -->|27018 → 27017| MReco["MongoDB reco"]
+  Host["Machine hôte"]
+  Host -->|8000| API["API"]
+  Host -->|5432| PGU["Postgres utilisateur"]
+  Host -->|5433| PGS["Postgres santé"]
+  Host -->|5434| PGG["Postgres gamification"]
+  Host -->|27017| MLogs["MongoDB logs"]
+  Host -->|27018| MReco["MongoDB reco"]
+  Host -->|9000 / 9001| MinIO["MinIO"]
+  Host -->|3000| MB["Metabase"]
+  Host -->|9090| Prom["Prometheus"]
+  Host -->|3001| Graf["Grafana"]
 ```
 
-#### Tableau (local vs hôte)
+#### Vue d’ensemble (serveur / TrueNAS)
 
-| Service               | Port conteneur | Port hôte (local) | Exemple d’accès depuis l’hôte   |
-| --------------------- | -------------: | ----------------: | ------------------------------- |
-| API                   |           8000 |              8000 | `http://localhost:8000`         |
-| Postgres utilisateur  |           5432 |              5432 | `psql -h localhost -p 5432 ...` |
-| Postgres santé        |           5432 |              5433 | `psql -h localhost -p 5433 ...` |
-| Postgres gamification |           5432 |              5434 | `psql -h localhost -p 5434 ...` |
-| MongoDB logs          |          27017 |             27017 | `mongosh --port 27017`          |
-| MongoDB reco          |          27017 |             27018 | `mongosh --port 27018`          |
-| Prometheus (PC)       |           9090 |              9090 | `http://localhost:9090`       |
-| Grafana (PC)          |           3000 |              3001 | `http://localhost:3001`         |
+```mermaid
+flowchart LR
+  Host["Machine hôte"]
+  Host -->|18000| API["API"]
+  Host -->|15432| PGU["Postgres utilisateur"]
+  Host -->|15433| PGS["Postgres santé"]
+  Host -->|15434| PGG["Postgres gamification"]
+  Host -->|27017| MLogs["MongoDB logs"]
+  Host -->|27018| MReco["MongoDB reco"]
+  Host -->|19000 / 19001| MinIO["MinIO"]
+  Host -->|13000| MB["Metabase"]
+  Host -->|19090| Prom["Prometheus"]
+  Host -->|13001| Graf["Grafana"]
+```
 
-> **Monitoring** : Prometheus et Grafana sont documentés en détail dans la section [Monitoring (Prometheus & Grafana)](#monitoring-prometheus--grafana). Sur le serveur (`docker-compose.yml`), les ports hôte sont **19090** (Prometheus) et **13001** (Grafana).
+> Détail monitoring (dashboards, variables `.env`) : section [Monitoring (Prometheus & Grafana)](#monitoring-prometheus--grafana). Détail Metabase : **`METABASE.md`**.
 
 ### Arrêt
 
@@ -116,9 +164,9 @@ Les scénarios s’appuient sur le **seed** Postgres utilisateur (`c@c.fr` / `pa
 
 ### Initialisation des bases (schémas + données de test)
 
-**En local** (avec `docker-compose.yml`), les dossiers `init/postgres-utilisateur` et `init/postgres-sante` sont montés dans les conteneurs Postgres : au premier démarrage, les scripts `*.sql` sont exécutés automatiquement (schéma + seed si présents). Le seed **`init/postgres-sante/02_seed.sql`** contient des champs sensibles (**restrictions**, **profils**, **suivi biométrique**) au format **Fernet** ; ils correspondent à la clé documentée dans **`.env.example`** (`DATA_ENCRYPTION_KEY`).
+**En local** (avec `docker-compose-pc.yml`), les dossiers `init/postgres-utilisateur`, `init/postgres-sante` et `init/postgres-gamification` sont montés dans les conteneurs Postgres : au premier démarrage, les scripts `*.sql` sont exécutés automatiquement (schéma + seed si présents). Le seed **`init/postgres-sante/02_seed.sql`** contient des champs sensibles (**restrictions**, **profils**, **suivi biométrique**) au format **Fernet** ; ils correspondent à la clé documentée dans **`.env.example`** (`DATA_ENCRYPTION_KEY`).
 
-**Sur le serveur / TrueNAS** (avec `docker-compose.truenas.yml`), les bases démarrent vides. Après `docker compose -f docker-compose.truenas.yml up -d --build`, exécuter les scripts à la main (depuis la racine du projet) :
+**Sur le serveur / TrueNAS** (avec `docker-compose.yml`), les bases démarrent vides. Après `docker compose up -d --build`, exécuter les scripts à la main (depuis la racine du projet) :
 
 **1) Postgres utilisateur (schéma + seed) :**
 
