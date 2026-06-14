@@ -39,7 +39,13 @@ def load_ia_module() -> Any:
 
 
 def generer_programme(data: dict[str, Any]) -> dict[str, Any]:
-    """Délègue à `generer_programme` du script Mistral distant (appel HF Router)."""
+    """Délègue au mock local ou au script Mistral distant (appel HF Router)."""
+    from api.config import settings
+    from api.services import ia_mock
+
+    if settings.ia_mock_mode:
+        return ia_mock.generer_programme(data)
+
     from api.services.ia_referentiels_db import (
         load_exercice_materiel_liaisons,
         load_exercices_catalogue,

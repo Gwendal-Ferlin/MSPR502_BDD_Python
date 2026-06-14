@@ -1,4 +1,9 @@
 # TrueNAS / serveur : bases vides, pas de montage init (évite Permission denied sur ZFS).
+# Profils Compose : complete | offline | performance
+#   cp .env.complete.example .env && docker compose --profile complete up -d --build
+#   cp .env.offline.example .env  && docker compose --profile offline up -d --build
+#   cp .env.performance.example .env && docker compose -f docker-compose.performance.server.override.yml --profile performance up -d --build
+#
 # Après "docker compose up", initialiser les BDD à la main (voir README) :
 #
 # 1) Postgres utilisateur (schéma + seed si besoin) :
@@ -38,11 +43,12 @@
 
 services:
   postgres-utilisateur:
+    profiles: [complete, offline, performance]
     image: postgres:16-alpine
     container_name: postgres-utilisateur
     environment:
-      POSTGRES_USER: utilisateur_user
-      POSTGRES_PASSWORD: utilisateur_password
+      POSTGRES_USER: ${POSTGRES_UTILISATEUR_USER:-utilisateur_user}
+      POSTGRES_PASSWORD: ${POSTGRES_UTILISATEUR_PASSWORD:-utilisateur_password}
       POSTGRES_DB: utilisateur_db
     ports:
       - "15432:5432"
@@ -58,11 +64,12 @@ services:
       start_period: 30s
 
   postgres-sante:
+    profiles: [complete, offline, performance]
     image: postgres:16-alpine
     container_name: postgres-sante
     environment:
-      POSTGRES_USER: sante_user
-      POSTGRES_PASSWORD: sante_password
+      POSTGRES_USER: ${POSTGRES_SANTE_USER:-sante_user}
+      POSTGRES_PASSWORD: ${POSTGRES_SANTE_PASSWORD:-sante_password}
       POSTGRES_DB: sante_db
     ports:
       - "15433:5432"
@@ -78,11 +85,12 @@ services:
       start_period: 30s
 
   postgres-gamification:
+    profiles: [complete, offline, performance]
     image: postgres:16-alpine
     container_name: postgres-gamification
     environment:
-      POSTGRES_USER: gamification_user
-      POSTGRES_PASSWORD: gamification_password
+      POSTGRES_USER: ${POSTGRES_GAMIFICATION_USER:-gamification_user}
+      POSTGRES_PASSWORD: ${POSTGRES_GAMIFICATION_PASSWORD:-gamification_password}
       POSTGRES_DB: gamification_db
     ports:
       - "15434:5432"
@@ -98,6 +106,7 @@ services:
       start_period: 30s
 
   mongodb-logs:
+    profiles: [complete, offline, performance]
     image: mongo:7
     container_name: mongodb-logs
     environment:
@@ -115,6 +124,7 @@ services:
       retries: 5
 
   mongodb-reco:
+    profiles: [complete, offline, performance]
     image: mongo:7
     container_name: mongodb-reco
     environment:
@@ -132,6 +142,7 @@ services:
       retries: 5
 
   minio:
+    profiles: [complete, offline]
     image: minio/minio:RELEASE.2024-12-18T13-15-44Z
     container_name: minio
     command: server /data --console-address ":9001"
@@ -148,34 +159,39 @@ services:
     restart: unless-stopped
 
   api:
+    profiles: [complete, offline, performance]
     build:
       context: .
       dockerfile: api/Dockerfile
     container_name: api
     ports:
       - "18000:8000"
+    env_file:
+      - .env
     environment:
+      APP_PROFILE: ${APP_PROFILE:-complete}
+      IA_MOCK_MODE: ${IA_MOCK_MODE:-false}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
       POSTGRES_UTILISATEUR_HOST: postgres-utilisateur
       POSTGRES_UTILISATEUR_PORT: "5432"
-      POSTGRES_UTILISATEUR_USER: utilisateur_user
-      POSTGRES_UTILISATEUR_PASSWORD: utilisateur_password
+      POSTGRES_UTILISATEUR_USER: ${POSTGRES_UTILISATEUR_USER:-utilisateur_user}
+      POSTGRES_UTILISATEUR_PASSWORD: ${POSTGRES_UTILISATEUR_PASSWORD:-utilisateur_password}
       POSTGRES_SANTE_HOST: postgres-sante
       POSTGRES_SANTE_PORT: "5432"
-      POSTGRES_SANTE_USER: sante_user
-      POSTGRES_SANTE_PASSWORD: sante_password
+      POSTGRES_SANTE_USER: ${POSTGRES_SANTE_USER:-sante_user}
+      POSTGRES_SANTE_PASSWORD: ${POSTGRES_SANTE_PASSWORD:-sante_password}
       POSTGRES_GAMIFICATION_HOST: postgres-gamification
       POSTGRES_GAMIFICATION_PORT: "5432"
-      POSTGRES_GAMIFICATION_USER: gamification_user
-      POSTGRES_GAMIFICATION_PASSWORD: gamification_password
+      POSTGRES_GAMIFICATION_USER: ${POSTGRES_GAMIFICATION_USER:-gamification_user}
+      POSTGRES_GAMIFICATION_PASSWORD: ${POSTGRES_GAMIFICATION_PASSWORD:-gamification_password}
       MONGODB_LOGS_HOST: mongodb-logs
       MONGODB_LOGS_PORT: "27017"
       MONGODB_RECO_HOST: mongodb-reco
       MONGODB_RECO_PORT: "27017"
-      JWT_SECRET: CHANGE_ME_JWT_SECRET
+      JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_JWT_SECRET}
       JWT_ALGORITHM: HS256
       JWT_EXPIRE_MINUTES: "60"
-      # Hugging Face (scripts ia-reco) : lues depuis le .env à la racine du projet lors du « docker compose »
-      # (substitution ${...}). Mettre HF_API_TOKEN dans ce .env — pas dans ia-reco/.env seul (non monté dans l’image).
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:-}
       HF_API_TOKEN: ${HF_API_TOKEN:-}
       HF_MODEL_ID: ${HF_MODEL_ID:-Qwen/Qwen2.5-7B-Instruct}
       HF_TIMEOUT_SEC: ${HF_TIMEOUT_SEC:-45}
@@ -197,16 +213,62 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+        required: false
+    networks:
+      - mspr502-network
+
+  backup:
+    profiles: [complete, offline]
+    build:
+      context: ./backup
+      dockerfile: Dockerfile
+    container_name: backup
+    env_file:
+      - .env
+    environment:
+      POSTGRES_UTILISATEUR_HOST: postgres-utilisateur
+      POSTGRES_UTILISATEUR_PORT: 5432
+      POSTGRES_UTILISATEUR_USER: ${POSTGRES_UTILISATEUR_USER:-utilisateur_user}
+      POSTGRES_UTILISATEUR_PASSWORD: ${POSTGRES_UTILISATEUR_PASSWORD:-utilisateur_password}
+      POSTGRES_SANTE_HOST: postgres-sante
+      POSTGRES_SANTE_PORT: 5432
+      POSTGRES_SANTE_USER: ${POSTGRES_SANTE_USER:-sante_user}
+      POSTGRES_SANTE_PASSWORD: ${POSTGRES_SANTE_PASSWORD:-sante_password}
+      POSTGRES_GAMIFICATION_HOST: postgres-gamification
+      POSTGRES_GAMIFICATION_PORT: 5432
+      POSTGRES_GAMIFICATION_USER: ${POSTGRES_GAMIFICATION_USER:-gamification_user}
+      POSTGRES_GAMIFICATION_PASSWORD: ${POSTGRES_GAMIFICATION_PASSWORD:-gamification_password}
+      MONGODB_LOGS_HOST: mongodb-logs
+      MONGODB_LOGS_PORT: 27017
+      MONGODB_RECO_HOST: mongodb-reco
+      MONGODB_RECO_PORT: 27017
+      BACKUP_OUT_DIR: /backups
+      RCLONE_REMOTE: ${RCLONE_REMOTE:-}
+      RCLONE_PATH: ${RCLONE_PATH:-MSPR502/backups}
+    volumes:
+      - ./backups:/backups
+      - ./rclone:/config:ro
+    depends_on:
+      postgres-utilisateur:
+        condition: service_healthy
+      postgres-sante:
+        condition: service_healthy
+      postgres-gamification:
+        condition: service_healthy
+      mongodb-logs:
+        condition: service_healthy
+      mongodb-reco:
+        condition: service_healthy
     networks:
       - mspr502-network
 
   metabase:
+    profiles: [complete]
     image: metabase/metabase:v0.52.8
     container_name: metabase
     ports:
       - "13000:3000"
     environment:
-      # Adapter l'URL publique (IP TrueNAS ou hostname) — voir METABASE.md
       MB_SITE_URL: ${METABASE_SITE_URL:-http://localhost:13000}
     volumes:
       - metabase_data:/metabase-data
@@ -226,6 +288,7 @@ services:
     restart: unless-stopped
 
   prometheus:
+    profiles: [complete]
     image: prom/prometheus:v2.55.1
     container_name: prometheus
     command:
@@ -242,6 +305,7 @@ services:
     restart: unless-stopped
 
   grafana:
+    profiles: [complete]
     image: grafana/grafana:11.4.0
     container_name: grafana
     ports:

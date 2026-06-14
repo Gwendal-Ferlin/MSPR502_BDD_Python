@@ -71,10 +71,48 @@ La documentation actuelle est **opérationnelle et exploitable** : elle couvre l
 
 ---
 
+### 4) Configurations multi-environnement (démonstration)
+
+#### Constat
+Le projet propose **trois profils Docker Compose** sur la stack locale (`docker-compose-pc.yml`), activables via `--profile complete|offline|performance` et des fichiers `.env.*.example` dédiés.
+
+#### Profil `complete`
+- **Services** : API, 5 bases, MinIO, Metabase, Prometheus, Grafana, backup (on-demand).
+- **IA** : appels réels Hugging Face Router (`IA_MOCK_MODE=false`, `HF_API_TOKEN` requis).
+- **Administration** : Metabase (analytique SQL), Grafana (métriques HTTP), routes API Admin/Super-Admin.
+- **Commande** : `cp .env.complete.example .env` puis `docker compose --profile complete up -d --build` (serveur) ou `docker compose -f docker-compose-pc.yml --profile complete up -d --build` (PC).
+
+#### Profil `offline`
+- **Services** : API, 5 bases, MinIO (médias sociaux) — pas de Metabase ni monitoring.
+- **IA** : mocks statiques (`api/services/ia_mock.py`, `IA_MOCK_MODE=true`) — **aucune connexion Internet** requise.
+- **Données** : seeds `init/` (démo statique).
+- **Commande** : `cp .env.offline.example .env` puis `docker compose --profile offline up -d --build` (serveur) ou équivalent PC.
+- **Preuve** : `GET /health` renvoie `"ia_mode": "mock"`.
+
+#### Profil `performance`
+- **Services** : API + 5 bases uniquement (pas MinIO, Metabase, Prometheus, Grafana).
+- **Données** : `init-lite/` (schéma + seed minimal, sans seed performance volumineux).
+- **Ressources** : limites mémoire via `docker-compose.performance.override.yml` (Postgres/Mongo 256 Mo, API 512 Mo).
+- **IA** : mocks (`IA_MOCK_MODE=true`) ; rate limiting désactivé.
+- **Monitoring** : endpoint `/metrics` conservé sur l’API, sans stack Prometheus/Grafana.
+- **Commande** : `cp .env.performance.example .env` puis override performance (PC : `docker-compose.performance.override.yml` ; serveur : `docker-compose.performance.server.override.yml`).
+
+#### Points forts
+- **Séparation claire** des cas d’usage (soutenance complète, salle sans réseau, PC modeste).
+- **Profil visible** via `/health` (`profile`, `ia_mode`).
+- **Tests** : `tests/tests/test_ia_offline.py` pour valider le mode mock.
+
+#### Limites
+- Le profil `performance` sur **serveur** n’applique pas `init-lite/` (contrainte ZFS) : limites mémoire via `docker-compose.performance.server.override.yml` ; init BDD toujours manuelle.
+- Changer de profil sur des **volumes déjà initialisés** ne réapplique pas `init-lite/` sur PC : prévoir `docker compose down -v` pour repartir de zéro en performance.
+
+---
+
 ### Conclusion
 
 L’environnement MSPR 502 présente un niveau de maturité **solide** pour un contexte projet/équipe :
 - **Reproductibilité** : bonne en local via Docker Compose et `.env`, avec une variante serveur maîtrisée mais plus manuelle.
 - **Robustesse au démarrage** : bonne, grâce aux healthchecks et au démarrage conditionnel de l’API.
 - **Documentation opérationnelle** : déjà complète sur les aspects démarrage + init + API, avec quelques améliorations possibles orientées exploitation et dépannage.
+- **Multi-environnement** : trois profils Compose documentés pour la démonstration (complète, offline, performance).
 

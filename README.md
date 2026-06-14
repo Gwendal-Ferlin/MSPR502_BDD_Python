@@ -40,10 +40,11 @@ L’API peut chiffrer **au niveau applicatif** certains champs PostgreSQL sensib
 
 À la racine du projet :
 
-**Local (PC, init automatique des BDD)** :
+**Local (PC, init automatique des BDD)** — choisir un **profil** (voir [Configurations multi-environnement](#configurations-multi-environnement)) :
 
 ```bash
-docker compose -f docker-compose-pc.yml up -d --build
+cp .env.complete.example .env
+docker compose -f docker-compose-pc.yml --profile complete up -d --build
 ```
 
 - **API** : http://localhost:8000
@@ -52,7 +53,8 @@ docker compose -f docker-compose-pc.yml up -d --build
 **Serveur / TrueNAS** (`docker-compose.yml`, ports hôte décalés — voir ci-dessous) :
 
 ```bash
-docker compose up -d --build
+cp .env.complete.example .env
+docker compose --profile complete up -d --build
 ```
 
 - **API** : http://localhost:18000
@@ -64,10 +66,10 @@ Les services démarrent dans cet ordre : Postgres (utilisateur, santé, gamifica
 
 Ce récapitulatif aide à comprendre les **décalages hôte/conteneur**. À l’intérieur du réseau Docker, les services communiquent via le **nom du service** et le **port conteneur** (ex. `postgres-sante:5432`, `api:8000`). Les ports « hôte » servent pour psql, mongosh, le navigateur, etc.
 
-| Contexte | Fichier Compose | Commande |
-| -------- | --------------- | -------- |
-| **Local (PC)** | `docker-compose-pc.yml` | `docker compose -f docker-compose-pc.yml up -d --build` |
-| **Serveur / TrueNAS** | `docker-compose.yml` | `docker compose up -d --build` |
+| Contexte | Fichier Compose | Commande (profil `complete`) |
+| -------- | --------------- | ---------------------------- |
+| **Local (PC)** | `docker-compose-pc.yml` | `docker compose -f docker-compose-pc.yml --profile complete up -d --build` |
+| **Serveur / TrueNAS** | `docker-compose.yml` | `docker compose --profile complete up -d --build` |
 
 #### Tableau des ports
 
@@ -128,10 +130,107 @@ flowchart LR
 
 > Détail monitoring (dashboards, variables `.env`) : section [Monitoring (Prometheus & Grafana)](#monitoring-prometheus--grafana). Détail Metabase : **`METABASE.md`**.
 
+### Configurations multi-environnement
+
+La démonstration peut s’exécuter sous **trois profils Compose** sur **`docker-compose-pc.yml`** (PC) et **`docker-compose.yml`** (serveur). Copier le fichier `.env` du profil voulu avant chaque lancement.
+
+| Profil | Objectif | Internet | IA | Admin / monitoring |
+| ------ | -------- | :------: | -- | ------------------ |
+| **`complete`** | Stack complète, soutenance « tout activé » | Oui (HF) | Hugging Face réel (`IA_MOCK_MODE=false`) | Metabase, Grafana, Prometheus, backup |
+| **`offline`** | Démo sans connexion externe | Non | Mocks statiques (`IA_MOCK_MODE=true`) | API + Swagger ; MinIO pour médias sociaux |
+| **`performance`** | Matériel modeste (RAM limitée) | Non | Mocks statiques | API seule ; `/metrics` sans Grafana |
+
+#### Commandes de démarrage — PC (`docker-compose-pc.yml`)
+
+**Configuration complète** :
+
+```bash
+cp .env.complete.example .env
+# Renseigner HF_API_TOKEN dans .env
+docker compose -f docker-compose-pc.yml --profile complete up -d --build
+```
+
+**Configuration offline** :
+
+```bash
+cp .env.offline.example .env
+docker compose -f docker-compose-pc.yml --profile offline up -d --build
+```
+
+**Configuration performance** (init allégée `init-lite/`, limites mémoire) :
+
+```bash
+cp .env.performance.example .env
+docker compose -f docker-compose-pc.yml -f docker-compose.performance.override.yml --profile performance up -d --build
+```
+
+#### Commandes de démarrage — Serveur / TrueNAS (`docker-compose.yml`)
+
+> Sur le serveur, les BDD démarrent **vides** (init manuelle, pas de montage `init/` — ZFS). Le profil `performance` n’utilise **pas** `init-lite/` (override dédié, limites mémoire uniquement).
+
+**Configuration complète** :
+
+```bash
+cp .env.complete.example .env
+# Adapter MINIO_PUBLIC_URL, METABASE_SITE_URL, GRAFANA_ROOT_URL (IP serveur)
+docker compose --profile complete up -d --build
+```
+
+**Configuration offline** :
+
+```bash
+cp .env.offline.example .env
+docker compose --profile offline up -d --build
+```
+
+**Configuration performance** :
+
+```bash
+cp .env.performance.example .env
+docker compose -f docker-compose.performance.server.override.yml --profile performance up -d --build
+```
+
+> Les services avec profil **ne démarrent pas** sans `--profile <nom>`. Un simple `docker compose up` ne lance **aucun** conteneur.
+
+#### Vérifier le profil actif
+
+```bash
+curl http://localhost:8000/health    # PC
+curl http://localhost:18000/health   # serveur
+```
+
+Réponse attendue :
+
+```json
+{"status": "ok", "profile": "offline", "ia_mode": "mock"}
+```
+
+| Profil | `profile` | `ia_mode` | Contrôles rapides |
+| ------ | --------- | --------- | ----------------- |
+| complete | `complete` | `live` | Metabase http://localhost:3000 ; Grafana http://localhost:3001 ; `POST /api/ia/recommandations` avec token |
+| offline | `offline` | `mock` | `POST /api/ia/*` OK sans `HF_API_TOKEN` ; fil social OK (MinIO) |
+| performance | `performance` | `mock` | `docker stats` — ~7 conteneurs ; pas de Metabase/Grafana/MinIO |
+
+#### Fichiers associés
+
+| Fichier | Rôle |
+| ------- | ---- |
+| `.env.complete.example` | Variables profil complet |
+| `.env.offline.example` | Variables profil offline |
+| `.env.performance.example` | Variables profil performance |
+| `docker-compose.performance.override.yml` | Init `init-lite/` + limites RAM/CPU (**PC**) |
+| `docker-compose.performance.server.override.yml` | Limites RAM/CPU uniquement (**serveur**) |
+| `init-lite/` | Schéma + seed minimal (sans `09_seed_seances_performance.sql`) |
+| `api/services/ia_mock.py` | Réponses IA statiques |
+
+Tests IA mock : `tests/tests/test_ia_offline.py` (unitaires + intégration si `ia_mode: mock`).
+
 ### Arrêt
 
 ```bash
-docker compose down
+docker compose -f docker-compose-pc.yml --profile complete down   # PC
+docker compose --profile complete down                             # serveur
+# ou --profile offline / --profile performance selon le profil lancé
 ```
 
 ### Tests automatisés (microservice `tests/`, bases pré-prod séparées)

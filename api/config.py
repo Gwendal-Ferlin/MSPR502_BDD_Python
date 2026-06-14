@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     # Générer : python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     data_encryption_key: str = ""
 
+    # Profil d'exécution : complete | offline | performance
+    app_profile: str = "complete"
+    # Mode mock IA (sans Hugging Face) — IA_MOCK_MODE=true
+    ia_mock_mode: bool = False
+
     # Rate limiting (SlowAPI) — par IP ; désactiver pour tests intensifs : RATE_LIMIT_ENABLED=false
     rate_limit_enabled: bool = True
     rate_limit_default: str = "200/minute"

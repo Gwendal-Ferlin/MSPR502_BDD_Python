@@ -65,4 +65,8 @@ def root():
 @app.get("/health")
 @limiter.exempt
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "profile": settings.app_profile,
+        "ia_mode": "mock" if settings.ia_mock_mode else "live",
+    }

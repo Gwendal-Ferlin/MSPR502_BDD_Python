@@ -37,7 +37,13 @@ def load_ia_plats_module() -> Any:
 
 
 def generer_plats(data: dict[str, Any]) -> dict[str, Any]:
-    """Délègue à `generer_recommandations_plats` du script distant."""
+    """Délègue au mock local ou au script distant."""
+    from api.config import settings
+    from api.services import ia_mock
+
+    if settings.ia_mock_mode:
+        return ia_mock.generer_plats(data)
+
     from api.services.ia_referentiels_db import (
         load_ingredients_by_budget,
         load_restriction_equivalences,

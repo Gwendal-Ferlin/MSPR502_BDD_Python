@@ -1,0 +1,45 @@
+# Override performance pour serveur / TrueNAS (sans montage init-lite — ZFS)
+# Usage : docker compose -f docker-compose.yml -f docker-compose.performance.server.override.yml --profile performance up -d --build
+
+services:
+  postgres-utilisateur:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  postgres-sante:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  postgres-gamification:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  mongodb-logs:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  mongodb-reco:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  api:
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"

@@ -1,0 +1,60 @@
+# Override pour le profil performance : init-lite + limites mémoire
+# Usage : docker compose -f docker-compose-pc.yml -f docker-compose.performance.override.yml --profile performance up -d --build
+
+services:
+  postgres-utilisateur:
+    volumes:
+      - pg_utilisateur_data:/var/lib/postgresql/data
+      - ./init-lite/postgres-utilisateur:/docker-entrypoint-initdb.d:ro
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  postgres-sante:
+    volumes:
+      - pg_sante_data:/var/lib/postgresql/data
+      - ./init-lite/postgres-sante:/docker-entrypoint-initdb.d:ro
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  postgres-gamification:
+    volumes:
+      - pg_gamification_data:/var/lib/postgresql/data
+      - ./init-lite/postgres-gamification:/docker-entrypoint-initdb.d:ro
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  mongodb-logs:
+    volumes:
+      - mongo_logs_data:/data/db
+      - ./init-lite/mongodb-logs:/docker-entrypoint-initdb.d:ro
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  mongodb-reco:
+    volumes:
+      - mongo_reco_data:/data/db
+      - ./init-lite/mongodb-reco:/docker-entrypoint-initdb.d:ro
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  api:
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
