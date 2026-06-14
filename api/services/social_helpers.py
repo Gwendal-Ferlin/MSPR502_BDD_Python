@@ -11,7 +11,7 @@ def fetch_auteur_public(db: Session, id_anonyme: str) -> AuteurPublicRead | None
             SELECT v.id_anonyme, cu.nom_affichage, cu.photo_profil_url
             FROM vault_correspondance v
             JOIN compte_utilisateur cu ON cu.id_user = v.id_user
-            WHERE v.id_anonyme = :id AND COALESCE(cu.est_supprime, false) = false
+            WHERE v.id_anonyme = CAST(:id AS uuid) AND COALESCE(cu.est_supprime, false) = false
             """
         ),
         {"id": id_anonyme},
@@ -35,7 +35,7 @@ def fetch_auteurs_public(db: Session, id_anonymes: set[str]) -> dict[str, Auteur
             SELECT v.id_anonyme, cu.nom_affichage, cu.photo_profil_url
             FROM vault_correspondance v
             JOIN compte_utilisateur cu ON cu.id_user = v.id_user
-            WHERE v.id_anonyme = ANY(:ids) AND COALESCE(cu.est_supprime, false) = false
+            WHERE v.id_anonyme = ANY(CAST(:ids AS uuid[])) AND COALESCE(cu.est_supprime, false) = false
             """
         ),
         {"ids": list(id_anonymes)},

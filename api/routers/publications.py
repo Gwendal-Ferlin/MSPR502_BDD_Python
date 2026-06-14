@@ -76,7 +76,7 @@ def lister_publications(
                 (SELECT COUNT(*)::int FROM publication_like pl WHERE pl.id_publication = p.id_publication) AS nb_likes,
                 EXISTS (
                     SELECT 1 FROM publication_like pl
-                    WHERE pl.id_publication = p.id_publication AND pl.id_anonyme = :current_id
+                    WHERE pl.id_publication = p.id_publication AND pl.id_anonyme = CAST(:current_id AS uuid)
                 ) AS est_like_par_moi,
                 (SELECT COUNT(*)::int FROM publication_commentaire pc
                  WHERE pc.id_publication = p.id_publication AND COALESCE(pc.est_supprime, false) = false) AS nb_commentaires
