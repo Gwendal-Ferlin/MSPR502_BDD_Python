@@ -94,12 +94,16 @@ Ce récapitulatif aide à comprendre les **décalages hôte/conteneur**. À l’
 
 Le service **`backup`** n’expose aucun port : il s’exécute à la demande (`docker compose run --rm backup`).
 
-#### Vue d’ensemble (local PC)
+#### Vues par profil (local PC)
+
+Chaque profil Compose n’active qu’un **sous-ensemble** de services. Lancer avec `--profile complete`, `--profile offline` ou `--profile performance` (voir [Configurations multi-environnement](#configurations-multi-environnement)).
+
+**Profil `complete`** — stack intégrale (`IA_MOCK_MODE=false`, Hugging Face)
 
 ```mermaid
 flowchart LR
   Host["Machine hôte"]
-  Host -->|8000| API["API"]
+  Host -->|8000| API["API ia_mode live"]
   Host -->|5432| PGU["Postgres utilisateur"]
   Host -->|5433| PGS["Postgres santé"]
   Host -->|5434| PGG["Postgres gamification"]
@@ -111,12 +115,41 @@ flowchart LR
   Host -->|3001| Graf["Grafana"]
 ```
 
-#### Vue d’ensemble (serveur / TrueNAS)
+**Profil `offline`** — sans Metabase ni monitoring ; IA mockée (`IA_MOCK_MODE=true`)
 
 ```mermaid
 flowchart LR
   Host["Machine hôte"]
-  Host -->|18000| API["API"]
+  Host -->|8000| API["API ia_mode mock"]
+  Host -->|5432| PGU["Postgres utilisateur"]
+  Host -->|5433| PGS["Postgres santé"]
+  Host -->|5434| PGG["Postgres gamification"]
+  Host -->|27017| MLogs["MongoDB logs"]
+  Host -->|27018| MReco["MongoDB reco"]
+  Host -->|9000 / 9001| MinIO["MinIO"]
+```
+
+**Profil `performance`** — noyau minimal ; `init-lite/` ; pas de MinIO ni monitoring
+
+```mermaid
+flowchart LR
+  Host["Machine hôte"]
+  Host -->|8000| API["API ia_mode mock /metrics"]
+  Host -->|5432| PGU["Postgres utilisateur"]
+  Host -->|5433| PGS["Postgres santé"]
+  Host -->|5434| PGG["Postgres gamification"]
+  Host -->|27017| MLogs["MongoDB logs"]
+  Host -->|27018| MReco["MongoDB reco"]
+```
+
+#### Vues par profil (serveur / TrueNAS)
+
+**Profil `complete`**
+
+```mermaid
+flowchart LR
+  Host["Machine hôte"]
+  Host -->|18000| API["API ia_mode live"]
   Host -->|15432| PGU["Postgres utilisateur"]
   Host -->|15433| PGS["Postgres santé"]
   Host -->|15434| PGG["Postgres gamification"]
@@ -126,6 +159,33 @@ flowchart LR
   Host -->|13000| MB["Metabase"]
   Host -->|19090| Prom["Prometheus"]
   Host -->|13001| Graf["Grafana"]
+```
+
+**Profil `offline`**
+
+```mermaid
+flowchart LR
+  Host["Machine hôte"]
+  Host -->|18000| API["API ia_mode mock"]
+  Host -->|15432| PGU["Postgres utilisateur"]
+  Host -->|15433| PGS["Postgres santé"]
+  Host -->|15434| PGG["Postgres gamification"]
+  Host -->|27017| MLogs["MongoDB logs"]
+  Host -->|27018| MReco["MongoDB reco"]
+  Host -->|19000 / 19001| MinIO["MinIO"]
+```
+
+**Profil `performance`**
+
+```mermaid
+flowchart LR
+  Host["Machine hôte"]
+  Host -->|18000| API["API ia_mode mock /metrics"]
+  Host -->|15432| PGU["Postgres utilisateur"]
+  Host -->|15433| PGS["Postgres santé"]
+  Host -->|15434| PGG["Postgres gamification"]
+  Host -->|27017| MLogs["MongoDB logs"]
+  Host -->|27018| MReco["MongoDB reco"]
 ```
 
 > Détail monitoring (dashboards, variables `.env`) : section [Monitoring (Prometheus & Grafana)](#monitoring-prometheus--grafana). Détail Metabase : **`METABASE.md`**.
@@ -381,7 +441,7 @@ Les données des bases **ne sont pas** dans l’image Docker : elles sont stock�
 
 ## Schéma BDD
 
-L’architecture repose sur **deux zones** : une base **Identité** (PII, compte + vault) et une base **Santé** (données pseudonymisées via `id_anonyme`). Les logs métier et recommandations sont en MongoDB.
+L’architecture repose sur **cinq stores** : 3 PostgreSQL (`utilisateur_db`, `sante_db`, `gamification_db`) et 2 MongoDB (`logs_config`, `reco`), reliés par **`id_anonyme`** via le vault. Les médias sociaux (`media_url`) sont stockés dans **MinIO** (hors schéma relationnel).
 
 ### Vue d’ensemble (Mermaid)
 
@@ -407,12 +467,15 @@ erDiagram
         datetime date_derniere_activite
         boolean consentement_sante_actif
     }
+
     VAULT_CORRESPONDANCE ||--o{ PUBLICATION : "publie"
     PUBLICATION ||--o{ PUBLICATION_LIKE : "reçoit"
     PUBLICATION ||--o{ PUBLICATION_COMMENTAIRE : "a"
+    VAULT_CORRESPONDANCE ||--o{ PUBLICATION_LIKE : "like"
+    VAULT_CORRESPONDANCE ||--o{ PUBLICATION_COMMENTAIRE : "commente"
     PUBLICATION {
         uuid id_publication PK
-        uuid id_anonyme
+        uuid id_anonyme FK
         string texte
         string media_url
         string media_type
@@ -420,32 +483,30 @@ erDiagram
         boolean est_supprime
     }
     PUBLICATION_LIKE {
-        uuid id_publication FK
-        uuid id_anonyme
+        uuid id_publication PK
+        uuid id_anonyme PK
         datetime date_creation
     }
     PUBLICATION_COMMENTAIRE {
         uuid id_commentaire PK
         uuid id_publication FK
-        uuid id_anonyme
+        uuid id_anonyme FK
         string texte
         datetime date_creation
         boolean est_supprime
     }
+
     VAULT_CORRESPONDANCE ||--|| PROFIL_SANTE : "définit"
     VAULT_CORRESPONDANCE ||--o{ OBJECTIF_UTILISATEUR : "poursuit"
     VAULT_CORRESPONDANCE ||--o{ SUIVI_BIOMETRIQUE : "mesure"
     VAULT_CORRESPONDANCE ||--o{ JOURNAL_ALIMENTAIRE : "enregistre"
     VAULT_CORRESPONDANCE ||--o{ SEANCE_ACTIVITE : "pratique"
-    VAULT_CORRESPONDANCE ||--o{ REPAS : "prépare"
-    VAULT_CORRESPONDANCE }o--o{ REF_RESTRICTION : "est sujet à"
-    VAULT_CORRESPONDANCE }o--o{ MATERIEL : "possède"
     PROFIL_SANTE {
         int id_profil PK
         uuid id_anonyme FK
-        int annee_naissance
+        string annee_naissance
         string sexe
-        int taille_cm
+        string taille_cm
         string niveau_activite
     }
     OBJECTIF_UTILISATEUR {
@@ -462,8 +523,8 @@ erDiagram
         int id_biometrie PK
         uuid id_anonyme FK
         datetime date_releve
-        float poids_kg
-        int score_sommeil
+        string poids_kg
+        string score_sommeil
     }
     JOURNAL_ALIMENTAIRE {
         int id_repas PK
@@ -476,17 +537,6 @@ erDiagram
         float total_glucides
         float total_lipides
     }
-    REPAS {
-        string id PK
-        uuid id_anonyme FK
-        string nom_repas
-        object aliments
-        float total_calories
-        float lipides
-        float glucides
-        float proteines
-        datetime created_at
-    }
     SEANCE_ACTIVITE {
         int id_seance PK
         uuid id_anonyme FK
@@ -497,10 +547,14 @@ erDiagram
     SEANCE_ACTIVITE ||--|{ DETAIL_PERFORMANCE : "détaille"
     REF_EXERCICE ||--o{ DETAIL_PERFORMANCE : "exécuté"
     DETAIL_PERFORMANCE {
+        int id_performance PK
+        int id_seance FK
+        int id_exercice FK
         int series
         int reps
         float charge_kg
     }
+
     REF_RESTRICTION {
         int id_restriction PK
         string nom
@@ -534,7 +588,124 @@ erDiagram
         int id_materiel PK
         string nom
     }
-    REF_EXERCICE }o--o{ MATERIEL : "nécessite"
+    EXERCICE_MATERIEL {
+        int id_exercice PK
+        int id_materiel PK
+    }
+    UTILISATEUR_RESTRICTION {
+        uuid id_anonyme PK
+        int id_restriction PK
+    }
+    UTILISATEUR_MATERIEL {
+        uuid id_anonyme PK
+        int id_materiel PK
+    }
+    REF_EXERCICE ||--o{ EXERCICE_MATERIEL : "nécessite"
+    MATERIEL ||--o{ EXERCICE_MATERIEL : "utilisé par"
+    REF_RESTRICTION ||--o{ UTILISATEUR_RESTRICTION : "associe"
+    VAULT_CORRESPONDANCE ||--o{ UTILISATEUR_RESTRICTION : "a"
+    MATERIEL ||--o{ UTILISATEUR_MATERIEL : "associe"
+    VAULT_CORRESPONDANCE ||--o{ UTILISATEUR_MATERIEL : "possède"
+
+    VAULT_CORRESPONDANCE ||--o{ GAMIFICATION_USER_INVENTORY : "zoo"
+    VAULT_CORRESPONDANCE ||--o| GAMIFICATION_USER_CURRENCY : "pépites"
+    VAULT_CORRESPONDANCE ||--o{ GAMIFICATION_TRANSACTIONS : "achats"
+    GAMIFICATION_ANIMALS_CONFIG ||--o{ GAMIFICATION_CHROMAS_CONFIG : "catalogue"
+    GAMIFICATION_USER_INVENTORY ||--o{ GAMIFICATION_USER_CHROMAS : "débloque"
+    GAMIFICATION_USER_INVENTORY {
+        uuid id PK
+        uuid user_id
+        string animal_id
+        boolean is_visible
+        string active_chroma_id
+        datetime acquired_at
+        datetime updated_at
+    }
+    GAMIFICATION_USER_CHROMAS {
+        uuid id PK
+        uuid user_id
+        string animal_id
+        string chroma_id
+        datetime purchased_at
+    }
+    GAMIFICATION_USER_CURRENCY {
+        uuid id PK
+        uuid user_id UK
+        bigint coins
+        bigint total_coins_earned
+        bigint total_coins_spent
+        datetime updated_at
+    }
+    GAMIFICATION_TRANSACTIONS {
+        uuid id PK
+        uuid user_id
+        string transaction_type
+        bigint amount
+        string animal_id
+        string chroma_id
+        datetime created_at
+        jsonb metadata
+    }
+    GAMIFICATION_ANIMALS_CONFIG {
+        uuid id PK
+        string animal_id UK
+        string name
+        string emoji
+        bigint price
+        string rarity
+        string description
+        boolean is_available
+        datetime created_at
+    }
+    GAMIFICATION_CHROMAS_CONFIG {
+        uuid id PK
+        string animal_id FK
+        string chroma_id
+        string name
+        bigint price
+        int row_y
+        boolean is_available
+        datetime created_at
+    }
+
+    VAULT_CORRESPONDANCE ||--o{ EVENEMENTS : "loggé"
+    EVENEMENTS {
+        string _id PK
+        string id_log
+        datetime timestamp
+        uuid id_anonyme
+        string action
+        object details_techniques
+    }
+    CONFIG {
+        string _id PK
+        string cle UK
+        object valeur
+        string description
+    }
+
+    VAULT_CORRESPONDANCE ||--o{ RECOMMENDATIONS : "reçoit"
+    VAULT_CORRESPONDANCE ||--o{ REPAS : "stocke"
+    RECOMMENDATIONS {
+        string _id PK
+        uuid id_anonyme
+        string type
+        string titre
+        string contenu
+        datetime created_at
+        float score
+    }
+    REPAS {
+        string _id PK
+        uuid id_anonyme
+        string nom_repas
+        object aliments
+        float total_calories
+        float lipides
+        float glucides
+        float proteines
+        datetime created_at
+    }
 ```
 
 ### Schémas par base (Mermaid)
