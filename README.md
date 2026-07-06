@@ -710,14 +710,21 @@ erDiagram
 
 ### Schémas par base (Mermaid)
 
+Diagrammes **découpés** pour captures d’écran. Hors `utilisateur_db`, le **vault** apparaît comme entité de **référence logique** (`id_anonyme` stocké dans chaque base, sans FK inter-bases).
+
 #### PostgreSQL — `utilisateur_db`
+
+Zone **identité** (PII) + **vault** + fil **communauté**. Point d’ancrage de tout le modèle : `id_anonyme` est propagé vers les autres stores.
 
 ```mermaid
 erDiagram
     COMPTE_UTILISATEUR ||--|| VAULT_CORRESPONDANCE : "identifie"
     VAULT_CORRESPONDANCE ||--o{ PUBLICATION : "publie"
+    VAULT_CORRESPONDANCE ||--o{ PUBLICATION_LIKE : "like"
+    VAULT_CORRESPONDANCE ||--o{ PUBLICATION_COMMENTAIRE : "commente"
     PUBLICATION ||--o{ PUBLICATION_LIKE : "reçoit"
     PUBLICATION ||--o{ PUBLICATION_COMMENTAIRE : "a"
+
     COMPTE_UTILISATEUR {
         int id_user PK
         string email
@@ -739,7 +746,7 @@ erDiagram
     }
     PUBLICATION {
         uuid id_publication PK
-        uuid id_anonyme
+        uuid id_anonyme FK
         string texte
         string media_url
         string media_type
@@ -747,14 +754,14 @@ erDiagram
         boolean est_supprime
     }
     PUBLICATION_LIKE {
-        uuid id_publication FK
-        uuid id_anonyme
+        uuid id_publication PK
+        uuid id_anonyme PK
         datetime date_creation
     }
     PUBLICATION_COMMENTAIRE {
         uuid id_commentaire PK
         uuid id_publication FK
-        uuid id_anonyme
+        uuid id_anonyme FK
         string texte
         datetime date_creation
         boolean est_supprime
@@ -774,19 +781,40 @@ Les publications et interactions sont liées à l’**`id_anonyme`** (comme en b
 
 #### PostgreSQL — `sante_db`
 
+Données **pseudonymisées** : toutes les tables utilisateur portent `id_anonyme`, relié logiquement au vault (`utilisateur_db`). Référentiels IA et tables de liaison inclus.
+
 ```mermaid
 erDiagram
+    VAULT_CORRESPONDANCE ||--|| PROFIL_SANTE : "1-1"
+    VAULT_CORRESPONDANCE ||--o{ OBJECTIF_UTILISATEUR : "poursuit"
+    VAULT_CORRESPONDANCE ||--o{ SUIVI_BIOMETRIQUE : "mesure"
+    VAULT_CORRESPONDANCE ||--o{ JOURNAL_ALIMENTAIRE : "enregistre"
+    VAULT_CORRESPONDANCE ||--o{ SEANCE_ACTIVITE : "pratique"
+    VAULT_CORRESPONDANCE ||--o{ UTILISATEUR_RESTRICTION : "a"
+    VAULT_CORRESPONDANCE ||--o{ UTILISATEUR_MATERIEL : "possède"
+    SEANCE_ACTIVITE ||--|{ DETAIL_PERFORMANCE : "détaille"
+    REF_EXERCICE ||--o{ DETAIL_PERFORMANCE : "exécuté"
+    REF_EXERCICE ||--o{ EXERCICE_MATERIEL : "nécessite"
+    MATERIEL ||--o{ EXERCICE_MATERIEL : "utilisé par"
+    REF_RESTRICTION ||--o{ UTILISATEUR_RESTRICTION : "associe"
+    MATERIEL ||--o{ UTILISATEUR_MATERIEL : "associe"
+    REF_RESTRICTION_EQUIVALENCE ||--o{ REF_RESTRICTION_ALIAS : "alias"
+
+    VAULT_CORRESPONDANCE {
+        uuid id_anonyme PK
+        string ref_logique "utilisateur_db"
+    }
     PROFIL_SANTE {
         int id_profil PK
-        uuid id_anonyme
-        int annee_naissance
+        uuid id_anonyme FK
+        string annee_naissance
         string sexe
-        int taille_cm
+        string taille_cm
         string niveau_activite
     }
     OBJECTIF_UTILISATEUR {
         int id_objectif_u PK
-        uuid id_anonyme
+        uuid id_anonyme FK
         string type_objectif
         float valeur_cible
         string unite
@@ -796,14 +824,14 @@ erDiagram
     }
     SUIVI_BIOMETRIQUE {
         int id_biometrie PK
-        uuid id_anonyme
+        uuid id_anonyme FK
         datetime date_releve
-        float poids_kg
-        int score_sommeil
+        string poids_kg
+        string score_sommeil
     }
     JOURNAL_ALIMENTAIRE {
         int id_repas PK
-        uuid id_anonyme
+        uuid id_anonyme FK
         datetime horodatage
         string nom_repas
         string type_repas
@@ -814,7 +842,7 @@ erDiagram
     }
     SEANCE_ACTIVITE {
         int id_seance PK
-        uuid id_anonyme
+        uuid id_anonyme FK
         datetime horodatage
         string nom_seance
         int ressenti_effort_RPE
@@ -855,7 +883,6 @@ erDiagram
         string cle_canonique FK
         string alias
     }
-    REF_RESTRICTION_EQUIVALENCE ||--o{ REF_RESTRICTION_ALIAS : "alias"
     MATERIEL {
         int id_materiel PK
         string nom
@@ -872,26 +899,27 @@ erDiagram
         uuid id_anonyme PK
         int id_materiel PK
     }
-
-    SEANCE_ACTIVITE ||--|{ DETAIL_PERFORMANCE : "détaille"
-    REF_EXERCICE ||--o{ DETAIL_PERFORMANCE : "exécuté"
-    REF_EXERCICE }o--o{ MATERIEL : "nécessite"
-    REF_RESTRICTION }o--o{ UTILISATEUR_RESTRICTION : "associe"
-    MATERIEL }o--o{ UTILISATEUR_MATERIEL : "associe"
 ```
 
 #### PostgreSQL — `gamification_db`
 
-Base dédiée à la gamification (zoo, chromas, monnaie). Le champ **`user_id`** est un UUID aligné sur l’**`id_anonyme`** du vault (pas de FK inter-bases vers `utilisateur_db`).
+Zoo, chromas et monnaie. **`user_id` = `id_anonyme`** du vault (`utilisateur_db`) — référence logique, pas de FK inter-bases.
 
 ```mermaid
 erDiagram
+    VAULT_CORRESPONDANCE ||--o{ GAMIFICATION_USER_INVENTORY : "zoo"
+    VAULT_CORRESPONDANCE ||--o| GAMIFICATION_USER_CURRENCY : "pépites"
+    VAULT_CORRESPONDANCE ||--o{ GAMIFICATION_TRANSACTIONS : "achats"
     GAMIFICATION_ANIMALS_CONFIG ||--o{ GAMIFICATION_CHROMAS_CONFIG : "catalogue"
     GAMIFICATION_USER_INVENTORY ||--o{ GAMIFICATION_USER_CHROMAS : "débloque"
 
+    VAULT_CORRESPONDANCE {
+        uuid id_anonyme PK
+        string ref_logique "user_id = id_anonyme"
+    }
     GAMIFICATION_USER_INVENTORY {
         uuid id PK
-        uuid user_id
+        uuid user_id FK
         string animal_id
         boolean is_visible
         string active_chroma_id
@@ -900,14 +928,14 @@ erDiagram
     }
     GAMIFICATION_USER_CHROMAS {
         uuid id PK
-        uuid user_id
+        uuid user_id FK
         string animal_id
         string chroma_id
         datetime purchased_at
     }
     GAMIFICATION_USER_CURRENCY {
         uuid id PK
-        uuid user_id
+        uuid user_id UK
         bigint coins
         bigint total_coins_earned
         bigint total_coins_spent
@@ -915,7 +943,7 @@ erDiagram
     }
     GAMIFICATION_TRANSACTIONS {
         uuid id PK
-        uuid user_id
+        uuid user_id FK
         string transaction_type
         bigint amount
         string animal_id
@@ -936,7 +964,7 @@ erDiagram
     }
     GAMIFICATION_CHROMAS_CONFIG {
         uuid id PK
-        string animal_id
+        string animal_id FK
         string chroma_id
         string name
         bigint price
@@ -948,19 +976,27 @@ erDiagram
 
 #### MongoDB — `logs_config`
 
+Logs métier et paramètres globaux. Les événements portent **`id_anonyme`** (lien logique vers le vault).
+
 ```mermaid
 erDiagram
+    VAULT_CORRESPONDANCE ||--o{ EVENEMENTS : "loggé"
+
+    VAULT_CORRESPONDANCE {
+        uuid id_anonyme PK
+        string ref_logique "utilisateur_db"
+    }
     EVENEMENTS {
         string _id PK
         string id_log
         datetime timestamp
-        uuid id_anonyme
+        uuid id_anonyme FK
         string action
         object details_techniques
     }
     CONFIG {
         string _id PK
-        string cle
+        string cle UK
         object valeur
         string description
     }
@@ -968,11 +1004,20 @@ erDiagram
 
 #### MongoDB — `reco`
 
+Recommandations et repas/recettes. Documents indexés par **`id_anonyme`** (lien logique vers le vault).
+
 ```mermaid
 erDiagram
+    VAULT_CORRESPONDANCE ||--o{ RECOMMENDATIONS : "reçoit"
+    VAULT_CORRESPONDANCE ||--o{ REPAS : "stocke"
+
+    VAULT_CORRESPONDANCE {
+        uuid id_anonyme PK
+        string ref_logique "utilisateur_db"
+    }
     RECOMMENDATIONS {
         string _id PK
-        uuid id_anonyme
+        uuid id_anonyme FK
         string type
         string titre
         string contenu
@@ -981,7 +1026,7 @@ erDiagram
     }
     REPAS {
         string _id PK
-        uuid id_anonyme
+        uuid id_anonyme FK
         string nom_repas
         object aliments
         float total_calories
@@ -1002,7 +1047,7 @@ erDiagram
 | **MongoDB** `logs_config`        | Événements / logs (collection `evenements`) et config                                                                                         |
 | **MongoDB** `reco`               | Recommandations (collection `recommendations`), repas/recettes par utilisateur (collection `repas`)                                           |
 
-Le **vault** fait le lien RGPD entre l’identifiant nominatif (`id_user`) et l’identifiant anonyme (`id_anonyme`) utilisé partout en base Santé et dans les logs.
+Le **vault** (`utilisateur_db`) fait le lien RGPD entre l’identifiant nominatif (`id_user`) et l’identifiant anonyme (`id_anonyme`) utilisé en base Santé, Gamification, logs et reco.
 
 **Collection `repas` (MongoDB reco)** : repas/recettes par utilisateur. Chaque document contient `id_anonyme` (UUID), `nom_repas`, `aliments` (objet clé-valeur : nom aliment → dosage avec unité, ex. `"Poulet": "150 g"`), `total_calories`, `lipides`, `glucides`, `proteines`, `created_at`.
 
